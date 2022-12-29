@@ -1,6 +1,7 @@
 # To download library run "sudo pip3 install adafruit-circuitpython-servokit"
 # Import the servo driver library 
 from adafruit_servokit import ServoKit
+import RPi.GPIO as GPIO
 
 # variable for the servo driver channel
 throttle = 0
@@ -26,11 +27,18 @@ kit.servo[yaw].set_pulse_width_range(1000, 2000)
 kit.servo[aux1].set_pulse_width_range(1000, 2000)
 kit.servo[aux2].set_pulse_width_range(1000, 2000)
 
-While(1):
+try:
+        
+    while(True):
         kit.servo[throttle].angle = 0
         kit.servo[pitch].angle = 90
         kit.servo[roll].angle = 90
         kit.servo[yaw].angle = 90
         kit.servo[aux1].angle = 90
         kit.servo[aux2].angle = 90
+except:
+    pass
+    
+finally:
+    GPIO.cleanup()
         
