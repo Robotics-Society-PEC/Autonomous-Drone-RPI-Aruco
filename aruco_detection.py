@@ -8,15 +8,16 @@ import os
 def findArucoMarker(img,markerSize= 6, totalMarkers=250,
       draw=True):
     imgGray=cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    key = getattr(aruco, f'')
-    arucoDict= aruco.Dictionary.get(key)
+    key = getattr(aruco, f'DICT_{markerSize}X{markerSize}_{totalMarkers}')
+    arucoDict= aruco.Dictionary_get(key)
     arucoParam = aruco.DetectorParameters_create()
     bboxs, ids, rejected= aruco.detectMarkers(imgGray,
              arucoDict, parameters=arucoParam)
     print(ids)         
 
     if draw:
-        aruco.drawDetectedMarker(img, bboxs)
+        aruco.drawDetectedMarkers(img, bboxs)
+    return [bboxs,ids]
 
 
 
@@ -28,7 +29,8 @@ def main():
         success,img=cap.read()
         findArucoMarker(img)
         cv2.imshow("Image",img)
-        cv2.waitKey(1)
+        if cv2.waitKey(1) == ord('s'):
+            break
 
 if __name__ == "__main__":
     main()

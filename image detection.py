@@ -49,8 +49,8 @@ def main():
 	# red_upper = (20, 255, 255)
 	# blue_lower = (110, 50, 50)
 	# upper_blue = (130, 255, 255)
-	color_lower = (110, 50, 50)  #BGR
-	color_upper = (255, 255, 255) #RGB
+	color_lower = (0, 50, 50)  #BGR
+	color_upper = (197, 29, 52) #RGB
 
 
 	# if a video path was not supplied, grab the reference
