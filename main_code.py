@@ -1,6 +1,8 @@
 import math
 import itertools
 import time
+from adafruit_servokit import ServoKit
+import RPi.GPIO as GPIO
 import matplotlib.pyplot as plt
 
 MAX_THROTLE = 0.6 # all values in percentage 
@@ -58,6 +60,7 @@ def pid(Distance=0):
 
 
 
+
 x_obj = 500
 y_obj = 500 # coordinates of object
 vel_x_in = 0
@@ -74,30 +77,30 @@ time_between_function_call = 0.03
 #     pass
 
 #this is based on acceleration
-def transmit(roll_value , pitch_value , throtle_value):
-    acc_y = (pitch_value-0.5)*40
-    acc_x = (roll_value-0.5)*40
-    #add velocity limit
-    #print(f'accerlation {acc_x} , {acc_y}')
-    global x_obj,y_obj,vel_y_in , vel_x_in
-    x_obj = x_obj - (vel_x_in*time_between_function_call + 0.5*acc_x*time_between_function_call**2)
-    y_obj = y_obj - (vel_y_in*time_between_function_call + 0.5*acc_y*time_between_function_call**2)
+# def transmit(roll_value , pitch_value , throtle_value):
+#     acc_y = (pitch_value-0.5)*40
+#     acc_x = (roll_value-0.5)*40
+#     #add velocity limit
+#     #print(f'accerlation {acc_x} , {acc_y}')
+#     global x_obj,y_obj,vel_y_in , vel_x_in
+#     x_obj = x_obj - (vel_x_in*time_between_function_call + 0.5*acc_x*time_between_function_call**2)
+#     y_obj = y_obj - (vel_y_in*time_between_function_call + 0.5*acc_y*time_between_function_call**2)
 
-    vel_x = vel_x_in + acc_x*time_between_function_call
-    vel_y = vel_y_in + acc_y*time_between_function_call
-    vel_x_in = vel_x
-    vel_y_in = vel_y
-    print(vel_y_in)
-    print(vel_x_in)
-    MAX_VELOCITY = 10
-    if vel_x_in > MAX_VELOCITY:
-        vel_x_in = MAX_VELOCITY
-    elif vel_x_in < -MAX_VELOCITY:
-        vel_x_in = -MAX_VELOCITY
-    if vel_y_in > MAX_VELOCITY:
-        vel_y_in = MAX_VELOCITY
-    elif vel_y_in < -MAX_VELOCITY:
-        vel_y_in = -MAX_VELOCITY
+#     vel_x = vel_x_in + acc_x*time_between_function_call
+#     vel_y = vel_y_in + acc_y*time_between_function_call
+#     vel_x_in = vel_x
+#     vel_y_in = vel_y
+#     print(vel_y_in)
+#     print(vel_x_in)
+#     MAX_VELOCITY = 10
+#     if vel_x_in > MAX_VELOCITY:
+#         vel_x_in = MAX_VELOCITY
+#     elif vel_x_in < -MAX_VELOCITY:
+#         vel_x_in = -MAX_VELOCITY
+#     if vel_y_in > MAX_VELOCITY:
+#         vel_y_in = MAX_VELOCITY
+#     elif vel_y_in < -MAX_VELOCITY:
+#         vel_y_in = -MAX_VELOCITY
     
 
 def movedrone(x,y):
@@ -138,6 +141,54 @@ def movedrone(x,y):
     transmit(roll_value , pitch_value , throtle_value)
     return
 
+
+    # variable for the servo driver channel
+throttle = 0
+pitch = 1
+roll = 2
+yaw = 3
+aux1 = 4
+aux2 = 5
+roll_value_angle = 0
+pitch_value_angle = 0
+throtle_value_angle = 0
+
+# Create an object named kit with 16 channel
+kit = ServoKit(channels=16)
+# function to set the PWM duty cycle range, leave at default value
+kit.servo[throttle].set_pulse_width_range(1000, 2000)
+kit.servo[pitch].set_pulse_width_range(1000, 2000)
+kit.servo[roll].set_pulse_width_range(1000, 2000)
+kit.servo[yaw].set_pulse_width_range(1000, 2000)
+kit.servo[aux1].set_pulse_width_range(1000, 2000)
+kit.servo[aux2].set_pulse_width_range(1000, 2000)
+
+def transmit(roll_value , pitch_value , throtle_value):
+    # function used to set angle to desierd value
+    #kit.servo[0].angle = 180
+    # function used to set the acttuation range of servo
+    #kit.servo[0].actuation_range = 160
+
+    roll_value_angle = 1.8*roll_value
+    pitch_value_angle = 1.8*pitch_value
+    throtle_value_angle = 1.8*throtle_value
+    
+
+    try:
+        kit.servo[throttle].angle = throtle_value_angle
+        kit.servo[pitch].angle = pitch_value_angle
+        kit.servo[roll].angle = roll_value_angle
+        kit.servo[yaw].angle = 90
+        kit.servo[aux1].angle = 90
+        kit.servo[aux2].angle = 90
+    except:
+        # handel the error
+        pass   
+
+
+
+# also keep in mind that when to stop making pwm 
+#when code crashes or ends
 x_array = []
 y_array = []
 if __name__ == "__main__":
