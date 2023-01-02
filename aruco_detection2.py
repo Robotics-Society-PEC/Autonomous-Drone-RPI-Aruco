@@ -4,6 +4,7 @@ import cv2.aruco as aruco
 import math
 import sys
 import glob
+import pickle
 
 
 def isRotationMatrix(R):
@@ -77,8 +78,13 @@ while True:
         rvec = rvec_list_all[0][0]
         tvec = tvec_list_all[0][0]
 
-        aruco.drawAxis(frame, camera_matrix, camera_distortion , rvec[marker], tvec[marker], 100)
-        
+        aruco.drawAxis(frame, cameraMatrix, dist , rvec[marker], tvec[marker], 100)
+        filehandler = open('file.pkl', 'rb') 
+        object = pickle.load(filehandler) 
+        filehandler1 = open('file1.pkl', 'rb') 
+        object1 = pickle.load(filehandler1)
+        print(object)
+        print(object1)
         rvec_flipped = rvec* -1
         tvec_flipped = tvec* -1
         rotation_matrix, jacobian =cv2.Rodrigues(rvec_flipped)

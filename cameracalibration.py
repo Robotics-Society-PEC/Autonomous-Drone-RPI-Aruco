@@ -51,6 +51,17 @@ print("\nCamera Matrix:\n" , cameraMatrix)
 print("\nDistortion Parameters:\n" , dist)
 print("\nRotation Vectors:\n"  , rvecs)
 print("\nTranslation Vectors:\n" , tvecs)
+import pickle
+file = 'file.pkl'
+object = cameraMatrix
+filehandler = open(file, 'wb') 
+pickle.dump(object, filehandler)
+filehandler.close()
+file = 'file.pkl1'
+object1 = dist
+filehandler1 = open(file, 'wb') 
+pickle.dump(object1, filehandler1)
+filehandler1.close()
 
 ##########Undistortion##########
 
