@@ -1,67 +1,86 @@
-import numpy as np
 import cv2
+import numpy as np 
 import glob
+from tqdm import tqdm
+import PIL.ExifTags
+import PIL.Image
 
-chessboardSize= (24,17)
-frameSize=(1440,1080)
+#============================================
+# Camera calibration
+#============================================
 
-# termination criteria
-criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER ,30, 0.001)
+#Define size of chessboard target. 
 
-#prepare object points, like (0,0,0), (1,0,0) ,(2,0,0)  .....(6,5,0)
-objp= np.zeros((chessboardSize[0] * chessboardSize[1], 3), np.float32)
-objp[:,:2] =np.mgrid[0:chessboardSize, 0:chessboardSize[1]].T.reshape(-1,2)
+chessboard_size = (7,5)
 
-#Arrays to store object points and image points from all the images
-objPoints=[]
-imgPoints=[]
+#Define arrays to save detected points
+obj_points = [] #3D points in real world space 
+img_points = [] #3D points in image plane
 
-image = glob.glob('*.png')
+#Prepare grid and points to display
 
-for image in images:
-     print(image)
-     img= cv2.imread(image)
-     gray= cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-     # find the chess board corners
-     ret, corners= cv2.findChessboardCorners(gray, chessboardSize , None)
-
-     if ret == True:
-
-        objPoints.append(objp)
-        corners2 =cv2.cornerSubPix(gray, corners, (11,11),(-1,-1) , criteria)
-        imgPoints.append(corners)
-
-        #draw and display the corners
-        cv2.drawChessboardCorners(img, chessboardSize , corners2, ret)
-        cv2.imshow('img', img)
-        cv2.waitKey(500)
-
-cv2.destroyAllWindows() 
-
-#print("object points: ", objPoints)
-#print("image points: ", imgPoints)
+objp = np.zeros((np.prod(chessboard_size),3),dtype=np.float32)
 
 
-############Calibration###################
+objp[:,:2] = np.mgrid[0:chessboard_size[0], 0:chessboard_size[1]].T.reshape(-1,2)
 
-ret, cameraMatrix , dist , rvecs , tvecs =cv2.calibrateCamera(objPoints , imgPoints , frameSize , None , None)
+#read images
 
-print("Camera Calibrated: ", ret)
-print("\nCamera Matrix:\n" , cameraMatrix)
-print("\nDistortion Parameters:\n" , dist)
-print("\nRotation Vectors:\n"  , rvecs)
-print("\nTranslation Vectors:\n" , tvecs)
-import pickle
-file = 'file.pkl'
-object = cameraMatrix
-filehandler = open(file, 'wb') 
-pickle.dump(object, filehandler)
-filehandler.close()
-file = 'file.pkl1'
-object1 = dist
-filehandler1 = open(file, 'wb') 
-pickle.dump(object1, filehandler1)
-filehandler1.close()
+calibration_paths = glob.glob('images/*')
 
-##########Undistortion##########
+#Iterate over images to find intrinsic matrix
+for image_path in tqdm(calibration_paths):
 
+	#Load image
+	image = cv2.imread(image_path)
+	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+	print("Image loaded, Analizying...")
+	#find chessboard corners
+	ret,corners = cv2.findChessboardCorners(gray, chessboard_size, None)
+
+	if ret == True:
+		print("Chessboard detected!")
+		print(image_path)
+		#define criteria for subpixel accuracy
+		criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+		#refine corner location (to subpixel accuracy) based on criteria.
+		cv2.cornerSubPix(gray, corners, (5,5), (-1,-1), criteria)
+		obj_points.append(objp)
+		img_points.append(corners)
+
+#Calibrate camera
+ret, K, dist, rvecs, tvecs = cv2.calibrateCamera(obj_points, img_points,gray.shape[::-1], None, None)
+
+#Save parameters into numpy file
+np.save("./camera_params/ret", ret)
+np.save("./camera_params/K", K)
+np.save("./camera_params/dist", dist)
+np.save("./camera_params/rvecs", rvecs)
+np.save("./camera_params/tvecs", tvecs)
+
+#Get exif data in order to get focal length. 
+exif_img = PIL.Image.open(calibration_paths[0])
+
+exif_data = {
+	PIL.ExifTags.TAGS[k]:v
+	for k, v in exif_img._getexif().items()
+	if k in PIL.ExifTags.TAGS}
+
+#Get focal length in tuple form
+# focal_length_exif = exif_data['FocalLength']
+
+# #Get focal length in decimal form
+# focal_length = focal_length_exif[0]/focal_length_exif[1]
+
+# #Save focal length
+# np.save("./camera_params/FocalLength", focal_length)
+
+#Calculate projection error. 
+mean_error = 0
+for i in range(len(obj_points)):
+	img_points2, _ = cv2.projectPoints(obj_points[i],rvecs[i],tvecs[i], K, dist)
+	error = cv2.norm(img_points[i], img_points2, cv2.NORM_L2)/len(img_points2)
+	mean_error += error
+
+total_error = mean_error/len(obj_points)
+print (total_error)

@@ -2,10 +2,6 @@ import numpy as np
 import cv2
 import cv2.aruco as aruco
 import math
-import sys
-import glob
-import pickle
-
 
 def isRotationMatrix(R):
     Rt=np.transpose(R)
@@ -15,8 +11,7 @@ def isRotationMatrix(R):
     return n < 1e-6
 
 #Calculates rotation matrix to euler angles
-# the
-#  result is same as MATLAB except the order
+# the result is same as MATLAB except the order
 # of the euler angles (x and z are swapped).
 def rotationMatrixToEulerAngles(R) :
  
@@ -39,6 +34,12 @@ def rotationMatrixToEulerAngles(R) :
 
     
 marker_size=100
+with open('camera_params/K.npy','rb') as f:
+    camera_matrix=np.load(f)
+
+with open('camera_params/dist.npy','rb') as f:
+    camera_distortion=np.load(f)
+    
 
 aruco_dict= aruco.getPredefinedDictionary(aruco.DICT_6X6_250)
 
@@ -59,48 +60,27 @@ while True:
 # -----find all the aruco markers in the large frame
 
     corners,ids,rejected = aruco.detectMarkers(gray_frame, aruco_dict, camera_matrix, camera_distortion)
-    # arucoParams = aruco.DetectorParameters_create()
-    # corners,ids,rejected = aruco.detectMarkers(gray_frame, aruco_dict, parameters = arucoParams)
+    if ids is not None:
+        for id in ids:
+            if id is not None:
+                aruco.drawDetectedMarkers(frame, corners)#draw a box around all the detected markers
 
-    if ids is None:
-        aruco.drawDetectedMarkers(frame, corners)#draw a box around all the detected markers
-        
-        ret, cameraMatrix , dist , rvecs , tvecs =cv2.calibrateCamera(objPoints , imgPoints , frameSize , None , None)
+            #get pose of all single markers
+                rvec_list_all, tvec_list_all , _objPoints = aruco.estimatePoseSingleMarkers(corners, marker_size , camera_matrix, camera_distortion)
+                rvec = rvec_list_all[0][0]
+                tvec = tvec_list_all[0][0]
 
-        print("Camera Calibrated: ", ret)
-        print("\nCamera Matrix:\n" , cameraMatrix)
-        print("\nDistortion Parameters:\n" , dist)
-        print("\nRotation Vectors:\n"  , rvecs)
-        print("\nTranslation Vectors:\n" , tvecs)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
-    #get pose of all single markers
-        rvec_list_all, tvec_list_all , _objPoints = aruco.estimatePoseSingleMarkers(corners, marker_size , camera_matrix, camera_distortion)
-        rvec = rvec_list_all[0][0]
-        tvec = tvec_list_all[0][0]
+                aruco.drawAxis(frame, camera_matrix, camera_distortion , rvec, tvec, 100)
+                
+                rvec_flipped = rvec* -1
+                tvec_flipped = tvec* -1
+                rotation_matrix, jacobian =cv2.Rodrigues(rvec_flipped)
+                realworld_tvec = np.dot(rotation_matrix, tvec_flipped)
 
-        aruco.drawAxis(frame, cameraMatrix, dist , rvec[marker], tvec[marker], 100)
-        filehandler = open('file.pkl', 'rb') 
-        object = pickle.load(filehandler) 
-        filehandler1 = open('file1.pkl', 'rb') 
-        object1 = pickle.load(filehandler1)
-        print(object)
-        print(object1)
-        rvec_flipped = rvec* -1
-        tvec_flipped = tvec* -1
-        rotation_matrix, jacobian =cv2.Rodrigues(rvec_flipped)
-        realworld_tvec = np.dot(rotation_matrix, tvec_flipped)
+                pitch , roll ,yaw = rotationMatrixToEulerAngles(rotation_matrix)
 
-        pitch , roll ,yaw = rotationMatrixToEulerAngles(rotation_matrix)
-
-        tvec_str = " x=%4.0f y=%4.0f direction=%4.0f"%(realworld_tvec[0], realworld_tvec[1], math.degrees(yaw))
-        ret, cameraMatrix , dist , rvecs , tvecs =cv2.calibrateCamera(objPoints , imgPoints , frameSize , None , None)
-
-        print("Camera Calibrated: ", ret)
-        print("\nCamera Matrix:\n" , cameraMatrix)
-        print("\nDistortion Parameters:\n" , dist)
-        print("\nRotation Vectors:\n"  , rvecs)
-        print("\nTranslation Vectors:\n" , tvecs)
-        cv2.putText(frame, tvec_str ,(20,460), cv2.FONT_HERSHEY_PLAIN ,2 ,(0,0,255) ,2 , cv2.LINE_AA)
+                tvec_str = " x=%4.0f y=%4.0f direction=%4.0f"%(realworld_tvec[0], realworld_tvec[1], math.degrees(yaw))
+                cv2.putText(frame, tvec_str ,(20,460), cv2.FONT_HERSHEY_PLAIN ,2 ,(0,0,255) ,2 , cv2.LINE_AA)
 
     cv2.imshow('frame', frame)
 
