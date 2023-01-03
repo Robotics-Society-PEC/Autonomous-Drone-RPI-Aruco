@@ -64,7 +64,15 @@ while True:
         for id in ids:
             if id is not None:
                 aruco.drawDetectedMarkers(frame, corners)#draw a box around all the detected markers
-
+                print (corners)
+                arr=corners[0][0]
+                x1=arr[0][0]
+                x3=arr[2][0]
+                y1=arr[0][1]
+                y3=arr[2][1]
+                x_center=(x1+x3)/2
+                y_center=(y1+y3)/2
+                print(x_center,y_center)
             #get pose of all single markers
                 rvec_list_all, tvec_list_all , _objPoints = aruco.estimatePoseSingleMarkers(corners, marker_size , camera_matrix, camera_distortion)
                 rvec = rvec_list_all[0][0]
