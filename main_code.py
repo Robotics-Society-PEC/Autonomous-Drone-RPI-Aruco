@@ -6,44 +6,69 @@ import RPi.GPIO as GPIO
 import matplotlib.pyplot as plt
 import threading
 import aruco_detection2
-
+# from globalvariable import globalvariable.x_obj , globalvariable.y_obj
+import globalvariable
 
 
 MAX_THROTLE = 0.6 # all values in percentage 
 MIN_YAW = 0.3
 MAX_YAW = 0.7
-MIN_ROLL = 0.3
-MAX_ROLL = 0.7
-MIN_PITCH = 0.3
-MAX_PITCH = 0.7
+MIN_ROLL = 0.45
+MAX_ROLL = 0.55
+MIN_PITCH = 0.45
+MAX_PITCH = 0.55
 
-MAX_MAGNITUDE = 180000 # absolute value
+
+MAX_MAGNITUDE = 6000 # absolute value
 OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS  
-Kp = 10
-Ki = 15
-Kd = 40
+Kp = 15
+Ki = 8
+Kd = 3
 
 
 
 # can adjust yaw axis on basis of an edge of the aruco code or the box detected 
 # the above would help maybe i dont know 
 
-e_prev = list(itertools.repeat(0,200))
+e_prev_pitch = list(itertools.repeat(0,1000))
 total=0
-for ele in range(0,len(e_prev)):
-    total = total + e_prev[ele]
+for ele in range(0,len(e_prev_pitch)):
+    total = total + e_prev_pitch[ele]
 
-def pid(Distance=0):
+e_prev_roll = list(itertools.repeat(0,1000))
+total=0
+for ele in range(0,len(e_prev_roll)):
+    total = total + e_prev_roll[ele]
+
+def pid_roll(Distance=0):
     # PID has a limiter in it
     e = Distance
-    e_prev.insert(0,e)
-    del e_prev[len(e_prev)-1]
+    e_prev_roll.insert(0,e)
+    del e_prev_roll[len(e_prev_roll)-1]
     P = Kp*e
-    I = Ki*sum(e_prev)*time_between_function_call # summ of elements of e
-    D = Kd*(e_prev[0]-e_prev[1])/time_between_function_call # previous error - current error
+    I = Ki*sum(e_prev_roll)*time_between_function_call # summ of elements of e
+    D = Kd*(e_prev_roll[0]-e_prev_roll[1])/time_between_function_call # previous error - current error
 
     Distance_new =  P + I + D
-    print(Distance_new)
+    # print(Distance_new)
+    if Distance_new > MAX_MAGNITUDE/2:
+        return MAX_MAGNITUDE/2
+    elif Distance_new < -MAX_MAGNITUDE/2:
+        return -MAX_MAGNITUDE/2
+    else:    
+        return(Distance_new)
+
+def pid_pitch(Distance=0):
+    # PID has a limiter in it
+    e = Distance
+    e_prev_pitch.insert(0,e)
+    del e_prev_pitch[len(e_prev_pitch)-1]
+    P = Kp*e
+    I = Ki*sum(e_prev_pitch)*time_between_function_call # summ of elements of e
+    D = Kd*(e_prev_pitch[0]-e_prev_pitch[1])/time_between_function_call # previous error - current error
+
+    Distance_new =  P + I + D
+    # print(Distance_new)
     if Distance_new > MAX_MAGNITUDE/2:
         return MAX_MAGNITUDE/2
     elif Distance_new < -MAX_MAGNITUDE/2:
@@ -65,19 +90,19 @@ def pid(Distance=0):
 
 
 
-x_obj = 500
-y_obj = 500 # coordinates of object
+# globalvariable.x_obj = 500
+# globalvariable.y_obj = 500 # coordinates of object
 vel_x_in = 0
 vel_y_in = 0
-time_between_function_call = 0.03
+time_between_function_call = 0.05
 #this is based on velocity
 # def transmit(roll_value , pitch_value , throtle_value):
 #     velocity_y = (pitch_value-0.5)*100
 #     velocity_x = (roll_value-0.5)*100
 #     #print(f'Velocity {velocity_x} , {velocity_y}')
-#     global x_obj,y_obj
-#     x_obj = x_obj -velocity_x*time_between_function_call
-#     y_obj = y_obj -velocity_y*time_between_function_call
+#     global globalvariable.x_obj,globalvariable.y_obj
+#     globalvariable.x_obj = globalvariable.x_obj -velocity_x*time_between_function_call
+#     globalvariable.y_obj = globalvariable.y_obj -velocity_y*time_between_function_call
 #     pass
 
 #this is based on acceleration
@@ -86,9 +111,9 @@ time_between_function_call = 0.03
 #     acc_x = (roll_value-0.5)*40
 #     #add velocity limit
 #     #print(f'accerlation {acc_x} , {acc_y}')
-#     global x_obj,y_obj,vel_y_in , vel_x_in
-#     x_obj = x_obj - (vel_x_in*time_between_function_call + 0.5*acc_x*time_between_function_call**2)
-#     y_obj = y_obj - (vel_y_in*time_between_function_call + 0.5*acc_y*time_between_function_call**2)
+#     global globalvariable.x_obj,globalvariable.y_obj,vel_y_in , vel_x_in
+#     globalvariable.x_obj = globalvariable.x_obj - (vel_x_in*time_between_function_call + 0.5*acc_x*time_between_function_call**2)
+#     globalvariable.y_obj = globalvariable.y_obj - (vel_y_in*time_between_function_call + 0.5*acc_y*time_between_function_call**2)
 
 #     vel_x = vel_x_in + acc_x*time_between_function_call
 #     vel_y = vel_y_in + acc_y*time_between_function_call
@@ -108,20 +133,29 @@ time_between_function_call = 0.03
     
 
 def movedrone(x,y):
-    angle = (math.atan(y/x))*180/math.pi
-    if x<0 and y<0:
-        angle = angle+180
-    elif x<0 and y>0:
-        angle = angle+180
-    elif x>0 and y>0:
-        angle = angle
-    elif x>0 and y<0:
-        angle = angle + 360
-
-    print(f'angle = {angle}')
-    angle = int(angle) # adjust this for 0 - 360 to remove if else cases
+    # print(f"moving to {x} , {y}")
+    # if x!=0:
+    #     angle = (math.atan(y/x))*180/math.pi
+    #     if x<0 and y<0:
+    #         angle = angle+180
+    #     elif x<0 and y>0:
+    #         angle = angle+180
+    #     elif x>0 and y>0:
+    #         angle = angle
+    #     elif x>0 and y<0:
+    #         angle = angle + 360
+    # else:
+    #     if y>0:
+    #         angle = 90
+    #     elif y<0 :
+    #         angle = 270
+    #     else:
+    #         angle = 0 # correct in future
+    #print(f'angle = {angle}')
+    # angle = int(angle) # adjust this for 0 - 360 to remove if else cases
     displacement = math.sqrt(x**2 + y**2)
-    magnitude = pid(displacement)
+    magnitude_roll = pid_roll(x)
+    magnitude_pitch = pid_pitch(y)
     roll_value = 0.5
     pitch_value = 0.5
     throtle_value = 0.2
@@ -138,18 +172,18 @@ def movedrone(x,y):
         # this wrong check this
         pass
     else:
-        print(f'magnitude {magnitude}')
-        roll_value = (MIN_ROLL + MAX_ROLL)/2 + ((magnitude*math.cos(angle))*(MAX_ROLL - MIN_ROLL))/MAX_MAGNITUDE
-        pitch_value = (MIN_PITCH + MAX_PITCH)/2 + ((magnitude*math.sin(angle))*(MAX_PITCH - MIN_PITCH))/MAX_MAGNITUDE
+        print(f'magnitude_roll {magnitude_roll} ,  magnitude_pitch = {magnitude_pitch}')
+        roll_value = (MIN_ROLL + MAX_ROLL)/2 + ((magnitude_roll)*(MAX_ROLL - MIN_ROLL))/MAX_MAGNITUDE
+        pitch_value = (MIN_PITCH + MAX_PITCH)/2 + ((magnitude_pitch)*(MAX_PITCH - MIN_PITCH))/MAX_MAGNITUDE
     print(f'Roll : {roll_value} Pitch {pitch_value}')
     transmit(roll_value , pitch_value , throtle_value)
     return
 
 
     # variable for the servo driver channel
-throttle = 0
+throttle = 2
 pitch = 1
-roll = 2
+roll = 0
 yaw = 3
 aux1 = 4
 aux2 = 5
@@ -160,12 +194,18 @@ throtle_value_angle = 0
 # Create an object named kit with 16 channel
 kit = ServoKit(channels=16)
 # function to set the PWM duty cycle range, leave at default value
-kit.servo[throttle].set_pulse_width_range(1000, 2000)
-kit.servo[pitch].set_pulse_width_range(1000, 2000)
-kit.servo[roll].set_pulse_width_range(1000, 2000)
-kit.servo[yaw].set_pulse_width_range(1000, 2000)
-kit.servo[aux1].set_pulse_width_range(1000, 2000)
-kit.servo[aux2].set_pulse_width_range(1000, 2000)
+kit.servo[throttle].set_pulse_width_range(1100, 2010)
+kit.servo[pitch].set_pulse_width_range(1100, 2010)
+kit.servo[roll].set_pulse_width_range(1100, 2010)
+kit.servo[yaw].set_pulse_width_range(1100, 2010)
+kit.servo[aux1].set_pulse_width_range(1100, 2010)
+kit.servo[aux2].set_pulse_width_range(1100, 2010)
+kit.servo[throttle].actuation_range = 180
+kit.servo[pitch].actuation_range = 180
+kit.servo[roll].actuation_range = 180
+kit.servo[yaw].actuation_range = 180
+kit.servo[aux1].actuation_range = 180
+kit.servo[aux2].actuation_range = 180
 
 def transmit(roll_value , pitch_value , throtle_value):
     # function used to set angle to desierd value
@@ -173,33 +213,27 @@ def transmit(roll_value , pitch_value , throtle_value):
     # function used to set the acttuation range of servo
     #kit.servo[0].actuation_range = 160
 
-    roll_value_angle = 1.8*roll_value
-    pitch_value_angle = 1.8*pitch_value
-    throtle_value_angle = 1.8*throtle_value
+    roll_value_angle = 180*roll_value
+    pitch_value_angle = 180*pitch_value
+    throtle_value_angle = 180*throtle_value
     
 
 
-    kit.servo[throttle].angle = throtle_value_angle
+    kit.servo[throttle].angle = 90
     kit.servo[pitch].angle = pitch_value_angle
     kit.servo[roll].angle = roll_value_angle
     kit.servo[yaw].angle = 90
     kit.servo[aux1].angle = 90
     kit.servo[aux2].angle = 90
-    
 
-
-
-# also keep in mind that when to stop making pwm 
-#when code crashes or ends
-if __name__ == "__main__":
-
-    aruco_detect_thread = threading.Thread(target=aruco_detection2.detectArucoandGetCoordinates)
-    aruco_detect_thread.start()
+def pwm_generate():
+    print("test")
     try:
         while True:
+            # global globalvariable.x_obj,globalvariable.y_obj
             # get x,y from aruco or color detection
-            print(f'x_obj = {x_obj} y_obj = {y_obj}')
-            movedrone(x_obj , y_obj)
+            print(f'globalvariable.x_obj = {globalvariable.x_obj} globalvariable.y_obj = {globalvariable.y_obj}')
+            movedrone(globalvariable.x_obj , globalvariable.y_obj)
             time.sleep(time_between_function_call)
     except KeyboardInterrupt:
         kit.servo[throttle].angle = 0
@@ -219,4 +253,15 @@ if __name__ == "__main__":
         print(e)
         exit()
 
+# also keep in mind that when to stop making pwm 
+#when code crashes or ends
+if __name__ == "__main__":
+
+    pwm_generate_thread = threading.Thread(target=pwm_generate)
+    pwm_generate_thread.start()
+    
+    aruco_detection2.detectArucoandGetCoordinates()
+    pwm_generate_thread.stop()
+
+    
             
