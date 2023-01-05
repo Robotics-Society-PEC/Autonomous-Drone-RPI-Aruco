@@ -15,14 +15,14 @@ MIN_YAW = 0.3
 MAX_YAW = 0.7
 MIN_ROLL = 0.45
 MAX_ROLL = 0.55
-MIN_PITCH = 0.45
-MAX_PITCH = 0.55
+MIN_PITCH = 0.55
+MAX_PITCH = 0.45
 
 
-MAX_MAGNITUDE = 6000 # absolute value
+MAX_MAGNITUDE = 10000 # absolute value
 OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS  
 Kp = 15
-Ki = 8
+Ki = 1
 Kd = 3
 
 
@@ -180,32 +180,7 @@ def movedrone(x,y):
     return
 
 
-    # variable for the servo driver channel
-throttle = 2
-pitch = 1
-roll = 0
-yaw = 3
-aux1 = 4
-aux2 = 5
-roll_value_angle = 0
-pitch_value_angle = 0
-throtle_value_angle = 0
 
-# Create an object named kit with 16 channel
-kit = ServoKit(channels=16)
-# function to set the PWM duty cycle range, leave at default value
-kit.servo[throttle].set_pulse_width_range(1100, 2010)
-kit.servo[pitch].set_pulse_width_range(1100, 2010)
-kit.servo[roll].set_pulse_width_range(1100, 2010)
-kit.servo[yaw].set_pulse_width_range(1100, 2010)
-kit.servo[aux1].set_pulse_width_range(1100, 2010)
-kit.servo[aux2].set_pulse_width_range(1100, 2010)
-kit.servo[throttle].actuation_range = 180
-kit.servo[pitch].actuation_range = 180
-kit.servo[roll].actuation_range = 180
-kit.servo[yaw].actuation_range = 180
-kit.servo[aux1].actuation_range = 180
-kit.servo[aux2].actuation_range = 180
 
 def transmit(roll_value , pitch_value , throtle_value):
     # function used to set angle to desierd value
@@ -257,6 +232,32 @@ def pwm_generate():
 #when code crashes or ends
 if __name__ == "__main__":
 
+        # variable for the servo driver channel
+    throttle = 2
+    pitch = 1
+    roll = 0
+    yaw = 3
+    aux1 = 4
+    aux2 = 5
+    roll_value_angle = 0
+    pitch_value_angle = 0
+    throtle_value_angle = 0
+
+    # Create an object named kit with 16 channel
+    kit = ServoKit(channels=16)
+    # function to set the PWM duty cycle range, leave at default value
+    kit.servo[throttle].set_pulse_width_range(1100, 2010)
+    kit.servo[pitch].set_pulse_width_range(1100, 2010)
+    kit.servo[roll].set_pulse_width_range(1100, 2010)
+    kit.servo[yaw].set_pulse_width_range(1100, 2010)
+    kit.servo[aux1].set_pulse_width_range(1100, 2010)
+    kit.servo[aux2].set_pulse_width_range(1100, 2010)
+    kit.servo[throttle].actuation_range = 180
+    kit.servo[pitch].actuation_range = 180
+    kit.servo[roll].actuation_range = 180
+    kit.servo[yaw].actuation_range = 180
+    kit.servo[aux1].actuation_range = 180
+    kit.servo[aux2].actuation_range = 180
     pwm_generate_thread = threading.Thread(target=pwm_generate)
     pwm_generate_thread.start()
     
