@@ -12,6 +12,7 @@ MIN_ROLL = 0.3
 MAX_ROLL = 0.7
 MIN_PITCH = 0.3
 MAX_PITCH = 0.7
+HEIGHT = 300
 
 MAX_MAGNITUDE = 180000 # absolute value
 OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS  
@@ -24,10 +25,47 @@ Kd = 40
 # can adjust yaw axis on basis of an edge of the aruco code or the box detected 
 # the above would help maybe i dont know 
 
+def give_dist():
+    pass
+
 e_prev = list(itertools.repeat(0,200))
 total=0
 for ele in range(0,len(e_prev)):
     total = total + e_prev[ele]
+
+def arm():
+    s1= #input from switch on the quad
+    time.sleep(10000)
+    throtle_value = 0
+    yaw_value = 1
+    roll_value = 0
+    pitch_value = 1
+    time.sleep(5000)
+
+def takeoff():
+    dist=0 #distance between sonar and the ground in cm
+    while dist<=HEIGHT:
+        temp=dist
+        dist= give_dist()#take input from sonar
+        if dist<=temp:
+            throtle_value=throtle_value+0.05
+                
+        print (throtle_value)
+    Hover()
+
+def Hover():
+    dist=0
+    while True: #put condition for landing zone aruco detected
+        dist= give_dist()#take input from sonar
+        if dist > HEIGHT: #take dist input from sonar
+            throtle_value=throtle_value-0.01
+        elif dist < HEIGHT:
+            throtle_value=throtle_value+0.01
+        else: 
+            continue
+
+
+
 
 def pid(Distance=0):
     # PID has a limiter in it
@@ -169,9 +207,9 @@ def transmit(roll_value , pitch_value , throtle_value):
     # function used to set the acttuation range of servo
     #kit.servo[0].actuation_range = 160
 
-    roll_value_angle = 1.8*roll_value
-    pitch_value_angle = 1.8*pitch_value
-    throtle_value_angle = 1.8*throtle_value
+    roll_value_angle = 180*roll_value
+    pitch_value_angle = 180*pitch_value
+    throtle_value_angle = 180*throtle_value
     
 
     try:
