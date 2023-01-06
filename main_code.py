@@ -4,6 +4,10 @@ import time
 from adafruit_servokit import ServoKit
 import RPi.GPIO as GPIO
 import matplotlib.pyplot as plt
+import threading
+import aruco_detection2
+
+
 
 MAX_THROTLE = 0.6 # all values in percentage 
 MIN_YAW = 0.3
@@ -212,34 +216,45 @@ def transmit(roll_value , pitch_value , throtle_value):
     throtle_value_angle = 180*throtle_value
     
 
-    try:
-        kit.servo[throttle].angle = throtle_value_angle
-        kit.servo[pitch].angle = pitch_value_angle
-        kit.servo[roll].angle = roll_value_angle
-        kit.servo[yaw].angle = 90
-        kit.servo[aux1].angle = 90
-        kit.servo[aux2].angle = 90
-    except:
-        # handel the error
-        pass   
+
+    kit.servo[throttle].angle = throtle_value_angle
+    kit.servo[pitch].angle = pitch_value_angle
+    kit.servo[roll].angle = roll_value_angle
+    kit.servo[yaw].angle = 90
+    kit.servo[aux1].angle = 90
+    kit.servo[aux2].angle = 90
+    
 
 
 
 # also keep in mind that when to stop making pwm 
 #when code crashes or ends
-x_array = []
-y_array = []
 if __name__ == "__main__":
-    for i in range(0,10000):
-        # get x,y from aruco or color detection
-        movedrone(x_obj , y_obj)
-        time.sleep(time_between_function_call)
-        x_array.append(x_obj)
-        y_array.append(y_obj)
-        print(f'{i} iteration x coordinate was{x_obj} y coordinate was {y_obj}\n')
 
-    plt.plot(x_array,y_array, label = "drone Position")
-    plt.legend()
-    plt.ylim(-1000,1000)
-    plt.xlim(-1000,1000)
-    plt.show()
+    aruco_detect_thread = threading.Thread(target=aruco_detection2.detectArucoandGetCoordinates)
+    aruco_detect_thread.start()
+    try:
+        while True:
+            # get x,y from aruco or color detection
+            print(f'x_obj = {x_obj} y_obj = {y_obj}')
+            movedrone(x_obj , y_obj)
+            time.sleep(time_between_function_call)
+    except KeyboardInterrupt:
+        kit.servo[throttle].angle = 0
+        kit.servo[pitch].angle = 90
+        kit.servo[roll].angle = 90
+        kit.servo[yaw].angle = 90
+        kit.servo[aux1].angle = 90
+        kit.servo[aux2].angle = 90
+        exit()
+    except Exception as e:
+        kit.servo[throttle].angle = 0
+        kit.servo[pitch].angle = 90
+        kit.servo[roll].angle = 90
+        kit.servo[yaw].angle = 90
+        kit.servo[aux1].angle = 90
+        kit.servo[aux2].angle = 90
+        print(e)
+        exit()
+
+            
