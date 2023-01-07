@@ -52,8 +52,8 @@ def detectArucoandGetCoordinates():
 
     cap=cv2.VideoCapture(0)
 
-    camera_width = 640
-    camera_height= 480
+    camera_width = 1280
+    camera_height= 720
     camera_frame_rate= 40
 
     cap.set(2, camera_width)
@@ -62,45 +62,50 @@ def detectArucoandGetCoordinates():
 
     while True:
         ret,frame = cap.read() #grab a frame
-        if ret:
-            gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #convert to grayscale
-        # -----find all the aruco markers in the large frame
+        if not ret:
+            continue
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #convert to grayscale
+    # -----find all the aruco markers in the large frame
 
-            corners,ids,rejected = aruco.detectMarkers(gray_frame, aruco_dict, camera_matrix, camera_distortion)
-            if ids is not None:
-                for id in ids:
-                    if id is not None:
-                        aruco.drawDetectedMarkers(frame, corners)#draw a box around all the detected markers
-                        #print (corners)
-                        arr=corners[0][0]
-                        x1=arr[0][0]
-                        x3=arr[2][0]
-                        y1=arr[0][1]
-                        y3=arr[2][1]
-                        x_center=(x1+x3)/2
-                        y_center=(y1+y3)/2
-                        
-                        # global globalvariable.x_obj,globalvariable.y_obj
-                        globalvariable.x_obj = x_center -320
-                        globalvariable.y_obj = 240 - y_center
+        corners,ids,rejected = aruco.detectMarkers(gray_frame, aruco_dict, camera_matrix, camera_distortion)
+        if ids is None:
+            globalvariable.x_obj = 640
+            globalvariable.y_obj = 480
 
-                        #print(globalvariable.x_obj,globalvariable.y_obj)
-                    #get pose of all single markers
-                        rvec_list_all, tvec_list_all , _objPoints = aruco.estimatePoseSingleMarkers(corners, marker_size , camera_matrix, camera_distortion)
-                        rvec = rvec_list_all[0][0]
-                        tvec = tvec_list_all[0][0]
+            
+        for id in ids:
+            if id is not None:
+                aruco.drawDetectedMarkers(frame, corners)#draw a box around all the detected markers
+                #print (corners)
+                arr=corners[0][0]
+                x1=arr[0][0]
+                x3=arr[2][0]
+                y1=arr[0][1]
+                y3=arr[2][1]
+                x_center=(x1+x3)/2
+                y_center=(y1+y3)/2
+                
+                # global globalvariable.x_obj,globalvariable.y_obj
+                globalvariable.x_obj = x_center -320
+                globalvariable.y_obj = 240 - y_center
 
-                        aruco.drawAxis(frame, camera_matrix, camera_distortion , rvec, tvec, 100)
-                        
-                        rvec_flipped = rvec* -1
-                        tvec_flipped = tvec* -1
-                        rotation_matrix, jacobian =cv2.Rodrigues(rvec_flipped)
-                        realworld_tvec = np.dot(rotation_matrix, tvec_flipped)
+                #print(globalvariable.x_obj,globalvariable.y_obj)
+            #get pose of all single markers
+                rvec_list_all, tvec_list_all , _objPoints = aruco.estimatePoseSingleMarkers(corners, marker_size , camera_matrix, camera_distortion)
+                rvec = rvec_list_all[0][0]
+                tvec = tvec_list_all[0][0]
 
-                        pitch , roll ,yaw = rotationMatrixToEulerAngles(rotation_matrix)
+                aruco.drawAxis(frame, camera_matrix, camera_distortion , rvec, tvec, 100)
+                
+                rvec_flipped = rvec* -1
+                tvec_flipped = tvec* -1
+                rotation_matrix, jacobian =cv2.Rodrigues(rvec_flipped)
+                realworld_tvec = np.dot(rotation_matrix, tvec_flipped)
 
-                        tvec_str = " x=%4.0f y=%4.0f direction=%4.0f"%(realworld_tvec[0], realworld_tvec[1], math.degrees(yaw))
-                        cv2.putText(frame, tvec_str ,(20,460), cv2.FONT_HERSHEY_PLAIN ,2 ,(0,0,255) ,2 , cv2.LINE_AA)
+                pitch , roll ,yaw = rotationMatrixToEulerAngles(rotation_matrix)
+
+                tvec_str = " x=%4.0f y=%4.0f direction=%4.0f"%(realworld_tvec[0], realworld_tvec[1], math.degrees(yaw))
+                cv2.putText(frame, tvec_str ,(20,460), cv2.FONT_HERSHEY_PLAIN ,2 ,(0,0,255) ,2 , cv2.LINE_AA)
 
         cv2.imshow('frame', frame)
 

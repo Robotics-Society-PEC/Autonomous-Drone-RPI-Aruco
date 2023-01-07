@@ -1,2 +1,2 @@
-x_obj = 186
-y_obj = -17
+x_obj = 640
+y_obj = 480

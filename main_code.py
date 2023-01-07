@@ -10,6 +10,11 @@ import aruco_detection2
 import globalvariable
 
 
+from smbus import SMBus
+
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(18,GPIO.IN)
+
 MAX_THROTLE = 0.6 # all values in percentage 
 MIN_YAW = 0.3
 MAX_YAW = 0.7
@@ -17,7 +22,8 @@ MIN_ROLL = 0.45
 MAX_ROLL = 0.55
 MIN_PITCH = 0.55
 MAX_PITCH = 0.45
-
+HEIGHT = 100
+throtle_value = 0.2
 
 MAX_MAGNITUDE = 10000 # absolute value
 OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS  
@@ -25,6 +31,10 @@ Kp = 15
 Ki = 1
 Kd = 3
 
+
+ultrasonic_addr = 32
+bus = SMBus(1)
+distance = 0
 
 
 # can adjust yaw axis on basis of an edge of the aruco code or the box detected 
@@ -106,31 +116,100 @@ time_between_function_call = 0.05
 #     pass
 
 #this is based on acceleration
-# def transmit(roll_value , pitch_value , throtle_value):
-#     acc_y = (pitch_value-0.5)*40
-#     acc_x = (roll_value-0.5)*40
-#     #add velocity limit
-#     #print(f'accerlation {acc_x} , {acc_y}')
-#     global globalvariable.x_obj,globalvariable.y_obj,vel_y_in , vel_x_in
-#     globalvariable.x_obj = globalvariable.x_obj - (vel_x_in*time_between_function_call + 0.5*acc_x*time_between_function_call**2)
-#     globalvariable.y_obj = globalvariable.y_obj - (vel_y_in*time_between_function_call + 0.5*acc_y*time_between_function_call**2)
+def transmit(roll_value , pitch_value , throtle_value):
+    acc_y = (pitch_value-0.5)*40
+    acc_x = (roll_value-0.5)*40
+    #add velocity limit
+    #print(f'accerlation {acc_x} , {acc_y}')
+    global vel_y_in , vel_x_in
+    globalvariable.x_obj = globalvariable.x_obj - (vel_x_in*time_between_function_call + 0.5*acc_x*time_between_function_call**2)
+    globalvariable.y_obj = globalvariable.y_obj - (vel_y_in*time_between_function_call + 0.5*acc_y*time_between_function_call**2)
 
-#     vel_x = vel_x_in + acc_x*time_between_function_call
-#     vel_y = vel_y_in + acc_y*time_between_function_call
-#     vel_x_in = vel_x
-#     vel_y_in = vel_y
-#     print(vel_y_in)
-#     print(vel_x_in)
-#     MAX_VELOCITY = 10
-#     if vel_x_in > MAX_VELOCITY:
-#         vel_x_in = MAX_VELOCITY
-#     elif vel_x_in < -MAX_VELOCITY:
-#         vel_x_in = -MAX_VELOCITY
-#     if vel_y_in > MAX_VELOCITY:
-#         vel_y_in = MAX_VELOCITY
-#     elif vel_y_in < -MAX_VELOCITY:
-#         vel_y_in = -MAX_VELOCITY
+    vel_x = vel_x_in + acc_x*time_between_function_call
+    vel_y = vel_y_in + acc_y*time_between_function_call
+    vel_x_in = vel_x
+    vel_y_in = vel_y
+    print(vel_y_in)
+    print(vel_x_in)
+    MAX_VELOCITY = 10
+    if vel_x_in > MAX_VELOCITY:
+        vel_x_in = MAX_VELOCITY
+    elif vel_x_in < -MAX_VELOCITY:
+        vel_x_in = -MAX_VELOCITY
+    if vel_y_in > MAX_VELOCITY:
+        vel_y_in = MAX_VELOCITY
+    elif vel_y_in < -MAX_VELOCITY:
+        vel_y_in = -MAX_VELOCITY
     
+def give_dist():
+    global distance
+    try:
+
+        distance = int(bus.read_byte_data(ultrasonic_addr , 2))# have to read 2 ./ 4 bytes 
+        print(distance)
+    except KeyboardInterrupt:
+        exit()
+    except Exception as e:
+        print(f'Error occured while measuring distance {e}')
+    return distance
+    
+
+e_prev = list(itertools.repeat(0,200))
+total=0
+for ele in range(0,len(e_prev)):
+    total = total + e_prev[ele]
+
+def arm():
+    s1= 0 #input from switch on the quad
+    time.sleep(10000)
+    throtle_value = 0
+    yaw_value = 1
+    roll_value = 0
+    pitch_value = 1
+    time.sleep(5000)
+
+
+def pick_magnet():
+    kit.servo[aux1].angle = 180 #IN1
+    kit.servo[aux2].angle = 0 #IN2
+    kit.servo[aux3].angle = 180 #EN
+
+
+
+
+def takeoff():
+    print("now in takeoff")
+    dist=0 #distance between sonar and the ground in cm
+    global throtle_value
+    while dist <= HEIGHT:
+        temp=dist
+        dist= give_dist()#take input from sonar
+        if dist<=temp:
+            throtle_value=throtle_value+0.05
+        print (f'throtle = {throtle_value}')
+        time.sleep(0.1)
+    Hover()
+
+def Hover():
+    print("now in hover")
+    dist=0
+    global throtle_value
+    while True: #put condition for landing zone aruco detected
+        dist= give_dist()#take input from sonar
+        if dist > 1.1*HEIGHT: #take dist input from sonar
+            throtle_value=throtle_value-0.01
+        elif dist < 0.9*HEIGHT:
+            throtle_value=throtle_value+0.01   
+            continue
+        if throtle_value>1:
+            throtle_value=1
+        elif throtle_value<0:
+            throtle_value=0
+        print (f'throtle = {throtle_value}')
+        time.sleep(0.1)
+    
+
+
 
 def movedrone(x,y):
     # print(f"moving to {x} , {y}")
@@ -153,12 +232,19 @@ def movedrone(x,y):
     #         angle = 0 # correct in future
     #print(f'angle = {angle}')
     # angle = int(angle) # adjust this for 0 - 360 to remove if else cases
+    roll_value = 0.5
+    pitch_value = 0.5
+
+    if x >= 640 and y >= 480 :
+        print("Dont Move")
+        transmit(roll_value , pitch_value , throtle_value)
+        return
+        
     displacement = math.sqrt(x**2 + y**2)
     magnitude_roll = pid_roll(x)
     magnitude_pitch = pid_pitch(y)
-    roll_value = 0.5
-    pitch_value = 0.5
-    throtle_value = 0.2
+    
+    
 
     if displacement < OBJECT_IN_RADIUS_IN_PIXEL:
         # object directly below 
@@ -166,11 +252,9 @@ def movedrone(x,y):
         # make drone stable using GPS how GPS
         #throtle_value = something 
         print("Object under drone")
+        transmit(roll_value , pitch_value , throtle_value)
         
-    elif x==0 or y ==0:
-        #go nowhere 
-        # this wrong check this
-        pass
+    
     else:
         print(f'magnitude_roll {magnitude_roll} ,  magnitude_pitch = {magnitude_pitch}')
         roll_value = (MIN_ROLL + MAX_ROLL)/2 + ((magnitude_roll)*(MAX_ROLL - MIN_ROLL))/MAX_MAGNITUDE
@@ -182,24 +266,24 @@ def movedrone(x,y):
 
 
 
-def transmit(roll_value , pitch_value , throtle_value):
-    # function used to set angle to desierd value
-    #kit.servo[0].angle = 180
-    # function used to set the acttuation range of servo
-    #kit.servo[0].actuation_range = 160
+# def transmit(roll_value , pitch_value , throtle_value):
+#     # function used to set angle to desierd value
+#     #kit.servo[0].angle = 180
+#     # function used to set the acttuation range of servo
+#     #kit.servo[0].actuation_range = 160
 
-    roll_value_angle = 180*roll_value
-    pitch_value_angle = 180*pitch_value
-    throtle_value_angle = 180*throtle_value
+#     roll_value_angle = 180*roll_value
+#     pitch_value_angle = 180*pitch_value
+#     throtle_value_angle = 180*throtle_value
     
 
 
-    kit.servo[throttle].angle = 90
-    kit.servo[pitch].angle = pitch_value_angle
-    kit.servo[roll].angle = roll_value_angle
-    kit.servo[yaw].angle = 90
-    kit.servo[aux1].angle = 90
-    kit.servo[aux2].angle = 90
+#     kit.servo[throttle].angle = 90
+#     kit.servo[pitch].angle = pitch_value_angle
+#     kit.servo[roll].angle = roll_value_angle
+#     kit.servo[yaw].angle = 90
+#     kit.servo[aux1].angle = 90
+#     kit.servo[aux2].angle = 90
 
 def pwm_generate():
     print("test")
@@ -239,6 +323,7 @@ if __name__ == "__main__":
     yaw = 3
     aux1 = 4
     aux2 = 5
+    aux3 = 6
     roll_value_angle = 0
     pitch_value_angle = 0
     throtle_value_angle = 0
@@ -250,19 +335,33 @@ if __name__ == "__main__":
     kit.servo[pitch].set_pulse_width_range(1100, 2010)
     kit.servo[roll].set_pulse_width_range(1100, 2010)
     kit.servo[yaw].set_pulse_width_range(1100, 2010)
-    kit.servo[aux1].set_pulse_width_range(1100, 2010)
-    kit.servo[aux2].set_pulse_width_range(1100, 2010)
+    kit.servo[aux1].set_pulse_width_range(0, 20000)
+    kit.servo[aux2].set_pulse_width_range(0, 20000)
+    kit.servo[aux3].set_pulse_width_range(0, 20000)
     kit.servo[throttle].actuation_range = 180
     kit.servo[pitch].actuation_range = 180
     kit.servo[roll].actuation_range = 180
     kit.servo[yaw].actuation_range = 180
     kit.servo[aux1].actuation_range = 180
     kit.servo[aux2].actuation_range = 180
-    pwm_generate_thread = threading.Thread(target=pwm_generate)
-    pwm_generate_thread.start()
+    kit.servo[aux3].actuation_range = 180
+
+
+
+    pwm_generate_and_pid_thread = threading.Thread(target=pwm_generate)
+    
+
+    throtle_thread = threading.Thread(target = takeoff)
+    
+    while GPIO.input(18) == GPIO.HIGH:
+        pass
+    
+    pwm_generate_and_pid_thread.start()
+    arm()
+    throtle_thread.start()
     
     aruco_detection2.detectArucoandGetCoordinates()
-    pwm_generate_thread.stop()
+    pwm_generate_and_pid_thread.stop()
 
     
             

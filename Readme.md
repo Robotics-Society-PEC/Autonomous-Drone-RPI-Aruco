@@ -40,3 +40,8 @@ pip freeze > requirements.txt
 ```bash
 pip install --upgrade --force-reinstall <package_name>
 ```
+
+> Note : Apart from the PIP commands you also have to install some packages via sudo apt using the command mentioned below. This is valid for Raspberry pi.
+```bash
+ sudo apt install libcblas-dev libhdf5-dev libhdf5-serial-dev libatlas-base-dev libjasper-dev 
+ ```
