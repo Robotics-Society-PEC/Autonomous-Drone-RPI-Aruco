@@ -13,15 +13,9 @@ from i2c_get_dist import *
 
 
 # set range of all sticks
-MAX_THROTTLE = 0.6 
+MAX_THROTTLE = 1
 MIN_YAW = 0.3
 MAX_YAW = 0.7
-<<<<<<< HEAD
-MIN_ROLL = 0.3
-MAX_ROLL = 0.7
-MIN_PITCH = 0.3
-MAX_PITCH = 0.7
-=======
 MIN_ROLL = 0.45
 MAX_ROLL = 0.55
 MIN_PITCH = 0.55
@@ -36,7 +30,6 @@ AUX_1_CH = 4
 AUX_2_CH = 5
 AUX_3_CH = 6
 
->>>>>>> 7f7c8a71803ebe5a54571d4e5fba332f62e005fe
 
 #Pramaters related to PID loop and Aruco
 MAX_MAGNITUDE = 10000 # absolute value
@@ -75,16 +68,12 @@ assert ASCENT_RATE <= 0.3
 # can adjust yaw axis on basis of an edge of the aruco code or the box detected 
 # the above would help maybe i dont know 
 
-<<<<<<< HEAD
-e_prev = list(itertools.repeat(0,200))
-=======
 e_prev_pitch = list(itertools.repeat(0,1000))
 total=0
 for ele in range(0,len(e_prev_pitch)):
     total = total + e_prev_pitch[ele]
 
 e_prev_roll = list(itertools.repeat(0,1000))
->>>>>>> 7f7c8a71803ebe5a54571d4e5fba332f62e005fe
 total=0
 for ele in range(0,len(e_prev_roll)):
     total = total + e_prev_roll[ele]
@@ -107,7 +96,7 @@ def pid_roll(Distance=0):
     else:    
         return(Distance_new)
 
-def pid(Distance=0):
+def pid_pitch(Distance=0):
     # PID has a limiter in it
     e = Distance
     e_prev_pitch.insert(0,e)
@@ -233,19 +222,20 @@ def Hover():
     temp=0
     dist=0
     global throttle_value, DESCENT_RATE 
+    temp = give_dist()
     while True: #put condition for landing zone aruco detected
-        temp=dist
+        
         dist= give_dist()#take input from sonar
         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
-            if dist>=(1+0.05)*temp:
+            if dist>=temp :
                 throttle_value=throttle_value-DESCENT_RATE 
-            else:
-                continue
+                temp=dist
+        
         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
-            if dist<=(1+0.05)temp:
+            if dist<=temp :
                 throttle_value=throttle_value+ASCENT_RATE  
-            else:
-                continue 
+                temp=dist
+            
             
         if throttle_value>MAX_THROTTLE:
             throttle_value=MAX_THROTTLE
