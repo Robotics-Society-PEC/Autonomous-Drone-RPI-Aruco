@@ -12,26 +12,27 @@ aux1 = 4
 aux2 = 5
 
 # Create an object named kit with 16 channel
-kit = ServoKit(channels=16)
-
+kit = ServoKit(channels=16 ,)
+kit.frequency = 50
 # function used to set angle to desierd value
 #kit.servo[0].angle = 180
 # function used to set the acttuation range of servo
-#kit.servo[0].actuation_range = 160
+kit.servo[0].actuation_range = 160
 
 # function to set the PWM duty cycle range, leave at default value
-kit.servo[throttle].set_pulse_width_range(1000, 2000)
-kit.servo[pitch].set_pulse_width_range(1000, 2000)
+kit.servo[throttle].set_pulse_width_range(1010, 2010)
+kit.servo[pitch].set_pulse_width_range(1100, 2010)
 kit.servo[roll].set_pulse_width_range(1000, 2000)
 kit.servo[yaw].set_pulse_width_range(1000, 2000)
-kit.servo[aux1].set_pulse_width_range(1000, 2000)
+kit.servo[aux1].set_pulse_width_range(1010, 2010)
 kit.servo[aux2].set_pulse_width_range(1000, 2000)
+
 
 try:
         
     while(True):
         kit.servo[throttle].angle = 0
-        kit.servo[pitch].angle = 90
+        kit.servo[pitch].angle = 0
         kit.servo[roll].angle = 90
         kit.servo[yaw].angle = 90
         kit.servo[aux1].angle = 90
