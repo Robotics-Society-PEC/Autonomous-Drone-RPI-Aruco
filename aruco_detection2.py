@@ -62,8 +62,16 @@ def detectArucoandGetCoordinates():
 
     while True:
         ret,frame = cap.read() #grab a frame
+
+        cv2.imshow('frame', frame)
+
+        key=cv2.waitKey(1) & 0xFF 
+        
+        if key == ord('q'):
+            break
         if not ret:
             continue
+
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) #convert to grayscale
     # -----find all the aruco markers in the large frame
 
@@ -71,7 +79,7 @@ def detectArucoandGetCoordinates():
         if ids is None:
             globalvariable.x_obj = 640
             globalvariable.y_obj = 480
-
+            continue
             
         for id in ids:
             if id is not None:
@@ -107,11 +115,7 @@ def detectArucoandGetCoordinates():
                 tvec_str = " x=%4.0f y=%4.0f direction=%4.0f"%(realworld_tvec[0], realworld_tvec[1], math.degrees(yaw))
                 cv2.putText(frame, tvec_str ,(20,460), cv2.FONT_HERSHEY_PLAIN ,2 ,(0,0,255) ,2 , cv2.LINE_AA)
 
-        cv2.imshow('frame', frame)
-
-        key=cv2.waitKey(1) & 0xFF 
-        if key == ord('q'):
-            break
+        
 
     cap.release()
     cv2.destroyAllWindows()
