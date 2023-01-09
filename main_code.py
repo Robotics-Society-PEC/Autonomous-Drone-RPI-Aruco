@@ -230,15 +230,22 @@ def pick_magnet():
 def Hover():
     print("now in hover")
     global target_height
+    temp=0
     dist=0
     global throttle_value, DESCENT_RATE 
     while True: #put condition for landing zone aruco detected
+        temp=dist
         dist= give_dist()#take input from sonar
-
         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
-            throttle_value=throttle_value-DESCENT_RATE 
+            if dist>=(1+0.05)*temp:
+                throttle_value=throttle_value-DESCENT_RATE 
+            else:
+                continue
         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
-            throttle_value=throttle_value+ASCENT_RATE   
+            if dist<=(1+0.05)temp:
+                throttle_value=throttle_value+ASCENT_RATE  
+            else:
+                continue 
             
         if throttle_value>MAX_THROTTLE:
             throttle_value=MAX_THROTTLE
