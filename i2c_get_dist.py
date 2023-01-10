@@ -26,7 +26,7 @@ bus = SMBus(1)
 bmp280 = BMP280(i2c_dev=bus, i2c_addr= 0x77)
 
 baseline_values = []
-baseline_size = 50
+baseline_size = 100
 
 print("""relative-altitude.py - Calculates relative altitude from pressure.
 
@@ -42,7 +42,7 @@ for i in range(baseline_size):
     pressure = bmp280.get_pressure()
     baseline_values.append(pressure)
     print(i)
-    time.sleep(1)
+    time.sleep(0.5)
 
 globalvariable.baseline = sum(baseline_values[:-25]) / len(baseline_values[:-25])
 

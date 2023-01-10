@@ -39,7 +39,7 @@ OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS
 DESCENT_RATE = 0.01 
 ASCENT_RATE = 0.02 # TO BE SET 
 PERCENTAGE_TOLERANCE = 0.1 # BETWEEN 0 AND 1
-FREQ_IN_SEC_OF_THROTTLE_REFRESH = 0.4
+FREQ_IN_SEC_OF_THROTTLE_REFRESH = 0.01 # upto 157 hz allowed 
 FREQ_IN_SEC_OF_PWM_GEN = 0.05 
 target_height=3
 
@@ -187,62 +187,59 @@ def pick_magnet():
 
 
 
-# def Hover():
-#     print("now in hover")
-#     global target_height
-#     dist=0
-#     global throttle_value, DESCENT_RATE 
-#     while True: #put condition for landing zone aruco detected
-#         dist= give_dist()#take input from sonar
-#         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
-#             throttle_value=throttle_value-DESCENT_RATE 
-#             direction_of_error = "up"
-#         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
-#             throttle_value=throttle_value+ASCENT_RATE  
-#             direction_of_error = "down" 
-#         else:
-#             #throttle_value = .5 expe
-#             direction_of_error = "center"
-            
-#         if direction_of_error != "center" and direction_of_error != previoud_direction_of_error:
-#             previoud_direction_of_error = direction_of_error
-#             throttle_value = 0.5
-            
-
-#         if throttle_value>MAX_THROTTLE:
-#             throttle_value=MAX_THROTTLE
-#         elif throttle_value<0:
-#             throttle_value=0
-#         #print (f'throttle = {throttle_value}')
-#         time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
-
 def Hover():
     print("now in hover")
     global target_height
-    temp=0
     dist=0
     global throttle_value, DESCENT_RATE 
-    temp = give_dist()
     while True: #put condition for landing zone aruco detected
-        
         dist= give_dist()#take input from sonar
         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
-            if dist>=temp :
-                throttle_value=throttle_value-DESCENT_RATE 
-                temp=dist
-        
+            throttle_value=0.46
+            direction_of_error = "up"
         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
-            if dist<=temp :
-                throttle_value=throttle_value+ASCENT_RATE  
-                temp=dist
+            throttle_value=0.6
+            direction_of_error = "down" 
+        else:
+            throttle_value = 0.5
+            direction_of_error = "center"
             
             
+
         if throttle_value>MAX_THROTTLE:
             throttle_value=MAX_THROTTLE
         elif throttle_value<0:
             throttle_value=0
         #print (f'throttle = {throttle_value}')
         time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
+
+# def Hover():
+#     print("now in hover")
+#     global target_height
+#     temp=0
+#     dist=0
+#     global throttle_value, DESCENT_RATE 
+#     temp = give_dist()
+#     while True: #put condition for landing zone aruco detected
+        
+#         dist= give_dist()#take input from sonar
+#         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
+#             if dist>=temp :
+#                 throttle_value=throttle_value-DESCENT_RATE 
+#                 temp=dist
+        
+#         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
+#             if dist<=temp :
+#                 throttle_value=throttle_value+ASCENT_RATE  
+#                 temp=dist
+            
+            
+#         if throttle_value>MAX_THROTTLE:
+#             throttle_value=MAX_THROTTLE
+#         elif throttle_value<0:
+#             throttle_value=0
+#         #print (f'throttle = {throttle_value}')
+#         time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
     
 
 
