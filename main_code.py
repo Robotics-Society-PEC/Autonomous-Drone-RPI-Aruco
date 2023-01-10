@@ -33,13 +33,27 @@ AUX_3_CH = 6
 
 #Pramaters related to PID loop and Aruco
 MAX_MAGNITUDE = 10000 # absolute value
+MAX_MAGNITUDE_THROTTLE = 10000
 OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS  
+
+KP_ROLL = 15
+KI_ROLL = 1
+KD_ROLL = 3
+
+KP_PITCH = 15
+KI_PITCH = 1
+KD_PITCH = 3
+
+KP_THROTTLE = 100
+KI_THROTTLE = 40
+KD_THROTTLE = 50
+
 
 # paramters related to throttle control
 DESCENT_RATE = 0.01 
 ASCENT_RATE = 0.02 # TO BE SET 
 PERCENTAGE_TOLERANCE = 0.1 # BETWEEN 0 AND 1
-FREQ_IN_SEC_OF_THROTTLE_REFRESH = 0.01 # upto 157 hz allowed 
+FREQ_IN_SEC_OF_THROTTLE_REFRESH = 0.01 # upto 157 hz allowed # abhi 100 hz
 FREQ_IN_SEC_OF_PWM_GEN = 0.05 
 target_height=3
 
@@ -54,10 +68,7 @@ is_armed = False
 direction_of_error = "down"
 previoud_direction_of_error = "down"
 
-# paramters FOR PID
-Kp = 15
-Ki = 1
-Kd = 3
+
 
 
 #assertions
@@ -69,23 +80,18 @@ assert ASCENT_RATE <= 0.3
 # the above would help maybe i dont know 
 
 e_prev_pitch = list(itertools.repeat(0,1000))
-total=0
-for ele in range(0,len(e_prev_pitch)):
-    total = total + e_prev_pitch[ele]
-
 e_prev_roll = list(itertools.repeat(0,1000))
-total=0
-for ele in range(0,len(e_prev_roll)):
-    total = total + e_prev_roll[ele]
+e_prev_throttle = list(itertools.repeat(0,1000))
+
 
 def pid_roll(Distance=0):
     # PID has a limiter in it
     e = Distance
     e_prev_roll.insert(0,e)
     del e_prev_roll[len(e_prev_roll)-1]
-    P = Kp*e
-    I = Ki*sum(e_prev_roll)*FREQ_IN_SEC_OF_PWM_GEN # summ of elements of e
-    D = Kd*(e_prev_roll[0]-e_prev_roll[1])/FREQ_IN_SEC_OF_PWM_GEN # previous error - current error
+    P = KP_ROLL*e
+    I = KI_ROLL*sum(e_prev_roll)*FREQ_IN_SEC_OF_PWM_GEN # summ of elements of e
+    D = KD_ROLL*(e_prev_roll[0]-e_prev_roll[1])/FREQ_IN_SEC_OF_PWM_GEN # previous error - current error
 
     Distance_new =  P + I + D
     # print(Distance_new)
@@ -96,14 +102,32 @@ def pid_roll(Distance=0):
     else:    
         return(Distance_new)
 
+def pid_throtle(Height=0):
+    # PID has a limiter in it
+    e = Height
+    e_prev_throttle.insert(0,e)
+    del e_prev_throttle[len(e_prev_throttle)-1]
+    P = KP_THROTTLE*e
+    I = KI_THROTTLE*sum(e_prev_throttle)*FREQ_IN_SEC_OF_THROTTLE_REFRESH # summ of elements of e
+    D = KD_THROTTLE*(e_prev_throttle[0]-e_prev_throttle[1])/FREQ_IN_SEC_OF_THROTTLE_REFRESH # previous error - current error
+
+    Distance_new =  P + I + D
+    # print(Distance_new)
+    if Distance_new > MAX_MAGNITUDE/2:
+        return MAX_MAGNITUDE/2
+    elif Distance_new < -MAX_MAGNITUDE/2:
+        return -MAX_MAGNITUDE/2
+    else:    
+        return(Distance_new)        
+
 def pid_pitch(Distance=0):
     # PID has a limiter in it
     e = Distance
     e_prev_pitch.insert(0,e)
     del e_prev_pitch[len(e_prev_pitch)-1]
-    P = Kp*e
-    I = Ki*sum(e_prev_pitch)*FREQ_IN_SEC_OF_PWM_GEN # summ of elements of e
-    D = Kd*(e_prev_pitch[0]-e_prev_pitch[1])/FREQ_IN_SEC_OF_PWM_GEN # previous error - current error
+    P = KP_PITCH*e
+    I = KI_PITCH*sum(e_prev_pitch)*FREQ_IN_SEC_OF_PWM_GEN # summ of elements of e
+    D = KD_PITCH*(e_prev_pitch[0]-e_prev_pitch[1])/FREQ_IN_SEC_OF_PWM_GEN # previous error - current error
 
     Distance_new =  P + I + D
     # print(Distance_new)
@@ -187,24 +211,39 @@ def pick_magnet():
 
 
 
+# def Hover():
+#     print("now in hover")
+#     global target_height
+#     dist=0
+#     global throttle_value, DESCENT_RATE 
+#     while True: #put condition for landing zone aruco detected
+#         dist= give_dist()#take input from sonar
+#         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
+#             throttle_value=0.46
+#             direction_of_error = "up"
+#         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
+#             throttle_value=0.6
+#             direction_of_error = "down" 
+#         else:
+#             throttle_value = 0.5
+#             direction_of_error = "center"
+            
+            
+
+#         if throttle_value>MAX_THROTTLE:
+#             throttle_value=MAX_THROTTLE
+#         elif throttle_value<0:
+#             throttle_value=0
+#         #print (f'throttle = {throttle_value}')
+#         time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
+
 def Hover():
     print("now in hover")
-    global target_height
-    dist=0
-    global throttle_value, DESCENT_RATE 
+    global target_height , throttle_value, DESCENT_RATE
+    height =0
     while True: #put condition for landing zone aruco detected
-        dist= give_dist()#take input from sonar
-        if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
-            throttle_value=0.46
-            direction_of_error = "up"
-        elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
-            throttle_value=0.6
-            direction_of_error = "down" 
-        else:
-            throttle_value = 0.5
-            direction_of_error = "center"
-            
-            
+        height = give_dist()#take input from sonar
+        throttle_value = pid_throtle(target_height - height) / MAX_MAGNITUDE_THROTTLE
 
         if throttle_value>MAX_THROTTLE:
             throttle_value=MAX_THROTTLE
