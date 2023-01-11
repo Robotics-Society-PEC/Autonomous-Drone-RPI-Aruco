@@ -13,7 +13,7 @@ from i2c_get_dist import *
 
 
 # set range of all sticks
-MAX_THROTTLE = 1
+MAX_THROTTLE = 0.8
 MIN_YAW = 0.3
 MAX_YAW = 0.7
 MIN_ROLL = 0.45
@@ -33,7 +33,7 @@ AUX_3_CH = 6
 
 #Pramaters related to PID loop and Aruco
 MAX_MAGNITUDE = 10000 # absolute value
-MAX_MAGNITUDE_THROTTLE = 10000
+MAX_MAGNITUDE_THROTTLE = 500
 OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS  
 
 KP_ROLL = 15
@@ -44,9 +44,9 @@ KP_PITCH = 15
 KI_PITCH = 1
 KD_PITCH = 3
 
-KP_THROTTLE = 100
-KI_THROTTLE = 40
-KD_THROTTLE = 50
+KP_THROTTLE = 1
+KI_THROTTLE = 10
+KD_THROTTLE = 10
 
 
 # paramters related to throttle control
@@ -55,7 +55,7 @@ ASCENT_RATE = 0.02 # TO BE SET
 PERCENTAGE_TOLERANCE = 0.1 # BETWEEN 0 AND 1
 FREQ_IN_SEC_OF_THROTTLE_REFRESH = 0.01 # upto 157 hz allowed # abhi 100 hz
 FREQ_IN_SEC_OF_PWM_GEN = 0.05 
-target_height=3
+target_height=4
 
 
 # starting  values for all axis
@@ -104,6 +104,8 @@ def pid_roll(Distance=0):
 
 def pid_throtle(Height=0):
     # PID has a limiter in it
+    if abs(Height) < 0.3:
+        return throttle_value*MAX_MAGNITUDE_THROTTLE
     e = Height
     e_prev_throttle.insert(0,e)
     del e_prev_throttle[len(e_prev_throttle)-1]
@@ -113,12 +115,13 @@ def pid_throtle(Height=0):
 
     Distance_new =  P + I + D
     # print(Distance_new)
-    if Distance_new > MAX_MAGNITUDE/2:
-        return MAX_MAGNITUDE/2
-    elif Distance_new < -MAX_MAGNITUDE/2:
-        return -MAX_MAGNITUDE/2
-    else:    
-        return(Distance_new)        
+    if Distance_new > MAX_MAGNITUDE_THROTTLE:
+        return MAX_MAGNITUDE_THROTTLE
+    elif Distance_new < 0:
+        return 0
+    else:
+        return Distance_new
+      
 
 def pid_pitch(Distance=0):
     # PID has a limiter in it
@@ -243,6 +246,7 @@ def Hover():
     height =0
     while True: #put condition for landing zone aruco detected
         height = give_dist()#take input from sonar
+        
         throttle_value = pid_throtle(target_height - height) / MAX_MAGNITUDE_THROTTLE
 
         if throttle_value>MAX_THROTTLE:
