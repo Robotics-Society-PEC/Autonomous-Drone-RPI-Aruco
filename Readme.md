@@ -53,18 +53,26 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] PID for throttle using Altitude
 - [X] get altitude from BMP 280
 - [ ] write code for mux(currenlty in altitude hold mode the pitch yaw and roll is manual)
+- [ ] GPS (optional)
+- [ ] SD Card Log Support (optional)
+- [ ] Electromagnet Test
+- [ ] multi Aruco Support
+- [ ] Landing test
+- [ ] Searching Algorythm in main code
+
 
 ## Our Teams Members
 
 - Mansi Kalra
 - Reeshav Chowdhury
 - Soumil Arora
-- Shashank Aggarwal
+- Shashank Agarwal
 - Rishab Sood
 - Ansh Chawla
 - Aayush Singla
 - Vinayak Pandey
 - Darren Chahal
 - Kushal Nandi
+- Yash Jindal
 
 Special Thanks to Yash Jindal for keeping our motivation High and Cheering us througout the process.
