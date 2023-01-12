@@ -49,9 +49,10 @@ pip install --upgrade --force-reinstall <package_name>
 
 ## Tasks
 
-[ ] - get altitude from Raspberry pi to teensy(i2c)
-[ ] - PID for throttle using Altitude
-[*] - get altitude from BMP 280
+- [] get altitude from Raspberry pi to teensy(i2c)
+- [] PID for throttle using Altitude
+- [X] get altitude from BMP 280
+- [] write code for mux(currenlty in altitude hold mode the pitch yaw and roll is manual)
 
 ## Our Teams Members
 
