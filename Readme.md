@@ -42,6 +42,28 @@ pip install --upgrade --force-reinstall <package_name>
 ```
 
 > Note : Apart from the PIP commands you also have to install some packages via sudo apt using the command mentioned below. This is valid for Raspberry pi.
+
 ```bash
  sudo apt install libcblas-dev libhdf5-dev libhdf5-serial-dev libatlas-base-dev libjasper-dev 
  ```
+
+## Tasks
+
+[ ] - get altitude from Raspberry pi to teensy(i2c)
+[ ] - PID for throttle using Altitude
+[*] - get altitude from BMP 280
+
+## Our Teams Members
+
+- Mansi Kalra
+- Reeshav Chowdhury
+- Soumil Arora
+- Shashank Aggarwal
+- Rishab Sood
+- Ansh Chawla
+- Aayush Singla
+- Vinayak Pandey
+- Darren Chahal
+- Kushal Nandi
+
+Special Thanks to Yash Jindal for keeping our motivation High and Cheering us througout the process.

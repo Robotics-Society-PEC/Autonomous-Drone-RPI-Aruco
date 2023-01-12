@@ -30,6 +30,7 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 //                                                 USER-SPECIFIED DEFINES                                                 //                                                                 
 //========================================================================================================================//
 // #define BLUETOOTH_EN
+#define BMP280
 //Uncomment only one receiver type
 #define USE_PWM_RX
 //#define USE_PPM_RX
@@ -54,6 +55,9 @@ static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to mat
 //#define ACCEL_16G
 
 
+//modes
+#define STABILIZE 0
+#define ALTITUDE_HOLD_AUTO 1
 
 //========================================================================================================================//
 
@@ -64,6 +68,11 @@ static const uint8_t num_DSM_channels = 6; //If using DSM RX, change this to mat
 #include <Wire.h>     //I2c communication
 #include <SPI.h>      //SPI communication
 #include <PWMServo.h> //Commanding any extra actuators, installed with teensyduino installer
+
+#ifdef BMP280
+#include <Adafruit_BMP280.h>
+Adafruit_BMP280 bmp;
+#endif
 
 #if defined USE_SBUS_RX
   #include "src/SBUS/SBUS.h"   //sBus interface
@@ -250,9 +259,14 @@ PWMServo servo7;
 //DECLARE GLOBAL VARIABLES
 
 //General stuff
+float altitude_of_quad = 0;
+byte flight_mode = STABILIZE;
+float throttle_from_altitude = 0.2;
+double normalize_pressure = 978.2;
+
 float dt;
 unsigned long current_time, prev_time;
-unsigned long print_counter, serial_counter;
+unsigned long print_counter, serial_counter , time_since_last_altitude;
 unsigned long blink_counter, blink_delay;
 bool blinkAlternate;
 
@@ -309,10 +323,25 @@ void setup() {
   #ifdef BLUETOOTH_EN
   Serial8.begin(9600); //USB serial
   #endif
-  
+ 
   Serial.begin(50000);
   delay(500);
   
+  #ifdef BMP280
+  unsigned status;
+  status = bmp.begin(0x77);
+  if (!status) {
+    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
+                      "try a different address!"));
+    while (1) delay(10);
+  }
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
+  calibrateForAltitude(); // ALtitude
+  #endif 
   //Initialize all pins
   pinMode(13, OUTPUT); //Pin 13 LED blinker on board, do not modify 
   pinMode(m1Pin, OUTPUT);
@@ -409,11 +438,13 @@ void loop() {
    printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
   //printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
-
+  //printAltitudeData();
   //Get vehicle state
   getIMUdata(); //Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
   Madgwick(GyroX, -GyroY, -GyroZ, -AccX, AccY, AccZ, MagY, -MagX, MagZ, dt); //Updates roll_IMU, pitch_IMU, and yaw_IMU angle estimates (degrees)
-
+  #ifdef BMP280
+  getAltitude();
+  #endif
   //Compute desired state
   getDesState(); //Convert raw commands to normalized values based on saturated control limits
   
@@ -421,14 +452,16 @@ void loop() {
   controlANGLE(); //Stabilize on angle setpoint
   //controlANGLE2(); //Stabilize on angle setpoint using cascaded method. Rate controller must be tuned well first!
   //controlRATE(); //Stabilize on rate setpoint
-
+  #ifdef BMP280
+  PID_Throttle();
+  #endif
   //Actuator mixing and scaling to PWM values
   controlMixer(); //Mixes PID outputs to scaled actuator commands -- custom mixing assignments done here
   scaleCommands(); //Scales motor commands to 125 to 250 range (oneshot125 protocol) and servo PWM commands to 0 to 180 (for servo library)
 
   //Throttle cut check
   throttleCut(); //Directly sets motor commands to low based on state of ch5
-
+  checkFlightMode(); // change flight mode
   //Command actuators
   commandMotors(); //Sends command pulses to each motor pin using OneShot125 protocol
   servo1.write(s1_command_PWM); //Writes PWM value to servo object
@@ -937,7 +970,13 @@ void getDesState() {
    * (rate mode). yaw_des is scaled to be within max yaw in degrees/sec. Also creates roll_passthru, pitch_passthru, and
    * yaw_passthru variables, to be used in commanding motors/servos with direct unstabilized commands in controlMixer().
    */
+  if (flight_mode == STABILIZE)
+  {
   thro_des = (channel_1_pwm - 1000.0)/1000.0; //Between 0 and 1
+  }else if (flight_mode = ALTITUDE_HOLD_AUTO)
+  {
+    thro_des = throttle_from_altitude; // specify throtle based on height
+  }
   roll_des = (channel_2_pwm - 1500.0)/500.0; //Between -1 and 1
   pitch_des = (channel_3_pwm - 1500.0)/500.0; //Between -1 and 1
   yaw_des = (channel_4_pwm - 1500.0)/500.0; //Between -1 and 1
@@ -1711,14 +1750,64 @@ void printGyroData() {
   }
 }
 
-void printGyroData() {
+#ifdef BMP280
+void calibrateForAltitude()
+{
+// enter calibration code
+    // do slowly at 10 hz
+    Serial.println("Calibration Starting");
+    int i = 0;
+    normalize_pressure = 0;
+    float temp = 0;
+    while(i<50)
+    {
+      temp = bmp.readPressure();
+    normalize_pressure +=  temp; // do this 25 times in loop
+    Serial.println(temp);
+    i++;
+    delay(500);
+    }
+    normalize_pressure = normalize_pressure / 50.0;
+    // get altitude from sensor
+    Serial.println("Calibration Done");
+  }
+
+void PID_Throttle()
+{
+  throttle_from_altitude = "something";
+} 
+
+
+void getAltitude()
+{
+  if (current_time - time_since_last_altitude > 10000) {
+    time_since_last_altitude = micros();
+    altitude_of_quad = bmp.readAltitude(normalize_pressure);
+    // get altitude from sensor
+  }
+}
+void printAltitudeData() {
   if (current_time - print_counter > 10000) {
+    
     print_counter = micros();
     #ifdef BLUETOOTH_EN
-    Serial8.println(25);
+    Serial8.println(altitude_of_quad);
     #endif
-    Serial.println(25);
+    Serial.println(altitude_of_quad);
   }
+}
+#endif
+void checkFlightMode() {
+  #ifdef BMP280
+  if (channel_6_pwm > 1500)
+  {
+    flight_mode = ALTITUDE_HOLD_AUTO;
+  }else{
+    flight_mode = STABILIZE;
+  }
+  #else
+    flight_mode = STABILIZE;
+  #endif
 }
 
 void printAccelData() {
