@@ -31,6 +31,7 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 //========================================================================================================================//
 // #define BLUETOOTH_EN
 #define BMP280
+#define mux_pin 32
 //Uncomment only one receiver type
 #define USE_PWM_RX
 //#define USE_PPM_RX
@@ -178,26 +179,26 @@ float MagScaleZ = 1.0;
 
 //IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
 
-float AccErrorX = -0.01;
-float AccErrorY = 0.00;
+float AccErrorX = 0.08;
+float AccErrorY = -0.05;
 float AccErrorZ = 0.11;
-float GyroErrorX = 2.18;
-float GyroErrorY = 3.80;
-float GyroErrorZ = -5.16;
+float GyroErrorX = 2.14;
+float GyroErrorY = 3.51;
+float GyroErrorZ = -5.33;
 
 //Controller parameters (take note of defaults before modifying!): 
 float i_limit = 25.0;     //Integrator saturation level, mostly for safety (default 25.0)
-float maxRoll = 25.0;     //Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode 
-float maxPitch = 25.0;    //Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
-float maxYaw = 100.0;     //Max yaw rate in deg/sec
+float maxRoll = 50.0;     //Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode 
+float maxPitch = 50.0;    //Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
+float maxYaw = 160.0;     //Max yaw rate in deg/sec
 
 float Kp_roll_angle = 0.1;    //Roll P-gain - angle mode 
 float Ki_roll_angle = 0.3;    //Roll I-gain - angle mode
-float Kd_roll_angle = 0.05;   //Roll D-gain - angle mode (has no effect on controlANGLE2)
+float Kd_roll_angle = 0.15;   //Roll D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_roll = 0.9;      //Roll damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
 float Kp_pitch_angle = 0.1;   //Pitch P-gain - angle mode
 float Ki_pitch_angle = 0.3;   //Pitch I-gain - angle mode
-float Kd_pitch_angle = 0.05;  //Pitch D-gain - angle mode (has no effect on controlANGLE2)
+float Kd_pitch_angle = 0.15;  //Pitch D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_pitch = 0.9;     //Pitch damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
 
 float Kp_roll_rate = 0.2;    //Roll P-gain - rate mode
@@ -208,7 +209,7 @@ float Ki_pitch_rate = 0.20;    //Pitch I-gain - rate mode
 float Kd_pitch_rate = 0.0008; //Pitch D-gain - rate mode (be careful when increasing too high, motors will begin to overheat!)
 
 float Kp_yaw = 0.1;           //Yaw P-gain
-float Ki_yaw = 0.01;          //Yaw I-gain
+float Ki_yaw = 0.1;          //Yaw I-gain
 float Kd_yaw = 0.0;       //Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
 
 
@@ -343,6 +344,8 @@ void setup() {
   calibrateForAltitude(); // ALtitude
   #endif 
   //Initialize all pins
+  pinMode(mux_pin,OUTPUT);
+  digitalWrite(mux_pin,LOW);
   pinMode(13, OUTPUT); //Pin 13 LED blinker on board, do not modify 
   pinMode(m1Pin, OUTPUT);
   pinMode(m2Pin, OUTPUT);
@@ -410,7 +413,7 @@ void setup() {
 
   //If using MPU9250 IMU, uncomment for one-time magnetometer calibration (may need to repeat for new locations)
   //calibrateMagnetometer(); //Generates magentometer error and scale factors to be pasted in user-specified variables section
-
+  Wire1.begin();
 }
 
 
@@ -428,22 +431,25 @@ void loop() {
   loopBlink(); //Indicate we are in main loop with short blink every 1.5 seconds
 
   //Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
-  // printRadioData();     //Prints radio pwm values (expected: 1000 to 2000)
+ //printRadioData();     //Prints radio pwm values (expected: 1000 to 2000)
   //printDesiredState();  //Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   // printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   // printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   //printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-   printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
+   //printMotorCommands(); //Prints the values being written to the motors (expected: 120 to 250)
   //printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
-  //printAltitudeData();
+  printAltitudeData();
+  //printFlightMode();
   //Get vehicle state
   getIMUdata(); //Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
   Madgwick(GyroX, -GyroY, -GyroZ, -AccX, AccY, AccZ, MagY, -MagX, MagZ, dt); //Updates roll_IMU, pitch_IMU, and yaw_IMU angle estimates (degrees)
+  
   #ifdef BMP280
   getAltitude();
+  PID_Throttle();
   #endif
   //Compute desired state
   getDesState(); //Convert raw commands to normalized values based on saturated control limits
@@ -452,9 +458,7 @@ void loop() {
   controlANGLE(); //Stabilize on angle setpoint
   //controlANGLE2(); //Stabilize on angle setpoint using cascaded method. Rate controller must be tuned well first!
   //controlRATE(); //Stabilize on rate setpoint
-  #ifdef BMP280
-  PID_Throttle();
-  #endif
+
   //Actuator mixing and scaling to PWM values
   controlMixer(); //Mixes PID outputs to scaled actuator commands -- custom mixing assignments done here
   scaleCommands(); //Scales motor commands to 125 to 250 range (oneshot125 protocol) and servo PWM commands to 0 to 180 (for servo library)
@@ -973,7 +977,7 @@ void getDesState() {
   if (flight_mode == STABILIZE)
   {
   thro_des = (channel_1_pwm - 1000.0)/1000.0; //Between 0 and 1
-  }else if (flight_mode = ALTITUDE_HOLD_AUTO)
+  }else if (flight_mode == ALTITUDE_HOLD_AUTO)
   {
     thro_des = throttle_from_altitude; // specify throtle based on height
   }
@@ -1301,12 +1305,12 @@ void failSafe() {
   int check6 = 0;
 
   //Triggers for failure criteria
-  if (channel_1_pwm > maxVal || channel_1_pwm < minVal) check1 = 1;
-  if (channel_2_pwm > maxVal || channel_2_pwm < minVal) check2 = 1;
-  if (channel_3_pwm > maxVal || channel_3_pwm < minVal) check3 = 1;
-  if (channel_4_pwm > maxVal || channel_4_pwm < minVal) check4 = 1;
-  if (channel_5_pwm > maxVal || channel_5_pwm < minVal) check5 = 1;
-  if (channel_6_pwm > maxVal || channel_6_pwm < minVal) check6 = 1;
+  // if (channel_1_pwm > maxVal || channel_1_pwm < minVal) check1 = 1;
+  // if (channel_2_pwm > maxVal || channel_2_pwm < minVal) check2 = 1;
+  // if (channel_3_pwm > maxVal || channel_3_pwm < minVal) check3 = 1;
+  // if (channel_4_pwm > maxVal || channel_4_pwm < minVal) check4 = 1;
+  // if (channel_5_pwm > maxVal || channel_5_pwm < minVal) check5 = 1;
+  // if (channel_6_pwm > maxVal || channel_6_pwm < minVal) check6 = 1;
 
   //If any failures, set to default failsafe values
   if ((check1 + check2 + check3 + check4 + check5 + check6) > 0) {
@@ -1316,6 +1320,7 @@ void failSafe() {
     channel_4_pwm = channel_4_fs;
     channel_5_pwm = channel_5_fs;
     channel_6_pwm = channel_6_fs;
+    flight_mode = STABILIZE;
   }
 }
 
@@ -1774,7 +1779,7 @@ void calibrateForAltitude()
 
 void PID_Throttle()
 {
-  throttle_from_altitude = "something";
+  throttle_from_altitude = 0.2;
 } 
 
 
@@ -1797,16 +1802,27 @@ void printAltitudeData() {
   }
 }
 #endif
+void printFlightMode() {
+  if (current_time - print_counter > 10000) {
+    print_counter = micros();
+    Serial.print("Flight mode : ");
+    Serial.println (flight_mode);
+
+  }
+}
 void checkFlightMode() {
   #ifdef BMP280
   if (channel_6_pwm > 1500)
   {
     flight_mode = ALTITUDE_HOLD_AUTO;
+    digitalWrite(mux_pin,HIGH);
   }else{
     flight_mode = STABILIZE;
+    digitalWrite(mux_pin,LOW);
   }
   #else
     flight_mode = STABILIZE;
+    digitalWrite(mux_pin,LOW);
   #endif
 }
 

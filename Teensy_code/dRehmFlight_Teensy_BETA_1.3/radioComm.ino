@@ -9,7 +9,7 @@
 //This file contains all necessary functions and code used for radio communication to avoid cluttering the main code
 
 unsigned long rising_edge_start_1, rising_edge_start_2, rising_edge_start_3, rising_edge_start_4, rising_edge_start_5, rising_edge_start_6; 
-unsigned long channel_1_raw, channel_2_raw, channel_3_raw, channel_4_raw, channel_5_raw, channel_6_raw;
+unsigned long channel_1_raw, channel_2_raw, channel_3_raw, channel_4_raw, channel_5_raw, channel_6_raw,temp;
 int ppm_counter = 0;
 unsigned long time_ms = 0;
 
@@ -96,7 +96,7 @@ void serialEvent3(void)
 
 
 //INTERRUPT SERVICE ROUTINES (for reading PWM and PPM)
-
+#if defined USE_PPM_RX
 void getPPM() {
   unsigned long dt_ppm;
   int trig = digitalRead(PPM_Pin);
@@ -136,18 +136,26 @@ void getPPM() {
     ppm_counter = ppm_counter + 1;
   }
 }
+#endif
 
 void getCh1() {
+  //
+  //Serial.println("inside 1");
   int trigger = digitalRead(ch1Pin);
+  
   if(trigger == 1) {
     rising_edge_start_1 = micros();
   }
   else if(trigger == 0) {
+    
     channel_1_raw = micros() - rising_edge_start_1;
+    
   }
+  //Serial.println("outside 1");
 }
 
 void getCh2() {
+  //Serial.println("inside 2");
   int trigger = digitalRead(ch2Pin);
   if(trigger == 1) {
     rising_edge_start_2 = micros();
@@ -155,9 +163,11 @@ void getCh2() {
   else if(trigger == 0) {
     channel_2_raw = micros() - rising_edge_start_2;
   }
+  //Serial.println("outside 2");
 }
 
 void getCh3() {
+  //Serial.println("inside 3");
   int trigger = digitalRead(ch3Pin);
   if(trigger == 1) {
     rising_edge_start_3 = micros();
@@ -165,9 +175,11 @@ void getCh3() {
   else if(trigger == 0) {
     channel_3_raw = micros() - rising_edge_start_3;
   }
+  //Serial.println("outside 3");
 }
 
 void getCh4() {
+  //Serial.println("inside 4");
   int trigger = digitalRead(ch4Pin);
   if(trigger == 1) {
     rising_edge_start_4 = micros();
@@ -175,9 +187,11 @@ void getCh4() {
   else if(trigger == 0) {
     channel_4_raw = micros() - rising_edge_start_4;
   }
+  //Serial.println("outside 4");
 }
 
 void getCh5() {
+  //Serial.println("inside 5");
   int trigger = digitalRead(ch5Pin);
   if(trigger == 1) {
     rising_edge_start_5 = micros();
@@ -185,9 +199,11 @@ void getCh5() {
   else if(trigger == 0) {
     channel_5_raw = micros() - rising_edge_start_5;
   }
+  //Serial.println("outside 5");
 }
 
 void getCh6() {
+ // //Serial.println("inside 6");
   int trigger = digitalRead(ch6Pin);
   if(trigger == 1) {
     rising_edge_start_6 = micros();
@@ -195,4 +211,5 @@ void getCh6() {
   else if(trigger == 0) {
     channel_6_raw = micros() - rising_edge_start_6;
   }
+  //Serial.println("outside 6");
 }
