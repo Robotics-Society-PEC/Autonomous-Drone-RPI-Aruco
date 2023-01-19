@@ -71,8 +71,10 @@ pip install --upgrade --force-reinstall <package_name>
 - Ansh Chawla
 - Aayush Singla
 - Vinayak Pandey
-- Darren Chahal
-- Kushal Nandi
-- Yash Jindal
 
-Special Thanks to Yash Jindal for keeping our motivation High and Cheering us througout the process.
+## Addresses of diffrent devices
+
+- Teensy 0x44
+- MPU6060 - 0x68
+- BMP280 - 0x77
+- Compass - 0x1E

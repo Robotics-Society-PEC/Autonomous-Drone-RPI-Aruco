@@ -1,16 +1,12 @@
 #include <TinyGPS++.h>
-#include <SoftwareSerial.h>
-/* Create object named bt of the class SoftwareSerial */
-SoftwareSerial GPS_SoftSerial(6, 5);/* (Rx, Tx) */
-/* Create an object named gps of the class TinyGPSPlus */
-TinyGPSPlus gps;      
 
+TinyGPSPlus gps;
 volatile float minutes, seconds;
 volatile int degree, secs, mins;
 
 void setup() {
   Serial.begin(115200); /* Define baud rate for serial communication */
-  GPS_SoftSerial.begin(9600); /* Define baud rate for software serial communication */
+  Serial5.begin(9600); /* Define baud rate for software serial communication */
 }
 
 void loop() {
@@ -55,6 +51,8 @@ void loop() {
           Serial.print(mins);
           Serial.print("\t");
           Serial.println(secs);
+          Serial.print("charssssss processed = ");
+          Serial.println(gps.charsProcessed());
         }
         if (!alt_valid)
         {
@@ -84,8 +82,8 @@ static void smartDelay(unsigned long ms)
   unsigned long start = millis();
   do 
   {
-    while (GPS_SoftSerial.available())  /* Encode data read from GPS while data is available on serial port */
-      gps.encode(GPS_SoftSerial.read());
+    while (Serial5.available())  /* Encode data read from GPS while data is available on serial port */
+      gps.encode(Serial5.read());
 /* Encode basically is used to parse the string received by the GPS and to store it in a buffer so that information can be extracted from it */
   } while (millis() - start < ms);
 }
