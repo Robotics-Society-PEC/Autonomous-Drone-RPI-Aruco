@@ -29,6 +29,7 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 //========================================================================================================================//
 // #define BLUETOOTH_EN
 // #define m8nGPS
+#define sdcard
 #define BMP280
 #define mux_pin 32
 // Uncomment only one receiver type
@@ -67,6 +68,10 @@ static const uint8_t num_DSM_channels = 6; // If using DSM RX, change this to ma
 #include <PWMServo.h> //Commanding any extra actuators, installed with teensyduino installer
 #include "math.h"
 
+#ifdef sdcard
+#include <SD.h>
+File logfile;
+#endif
 #ifdef BMP280
 #include <Adafruit_BMP280.h>
 Adafruit_BMP280 bmp;
@@ -153,6 +158,10 @@ MPU9250 mpu9250(SPI2, 36);
 //                                               USER-SPECIFIED VARIABLES                                                 //
 //========================================================================================================================//
 
+#ifdef sdcard
+bool file_opened = false;
+bool error_occured = false;
+#endif
 //
 #ifdef m8nGPS
 unsigned long start;
@@ -275,6 +284,9 @@ double normalize_pressure = 978.2;
 float dt;
 unsigned long current_time, prev_time;
 unsigned long print_counter, serial_counter, time_since_last_altitude, time_since_last_gps;
+#ifdef sdcard
+unsigned long last_log_time;
+#endif
 unsigned long blink_counter, blink_delay;
 bool blinkAlternate;
 
@@ -334,7 +346,15 @@ void setup()
 
   Serial.begin(50000);
   delay(1000);
+#ifdef sdcard
+  if (!SD.begin(BUILTIN_SDCARD))
+  {
+    Serial.println("initialization of SDCARD failed!");
+    while (1)
+      ;
+  }
 
+#endif
 #ifdef BMP280
   delay(1000);
   unsigned status;
@@ -345,7 +365,7 @@ void setup()
                      "try a different address!"));
     while (1)
     {
-      status = bmp.begin(0x77);
+      status = bmp.begin(0x76);
       delay(1000);
     }
   }
@@ -459,10 +479,14 @@ void loop()
   //  printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   //  printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-// printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
-//   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
-//   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
-//   printAltitudeData();
+  // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
+  //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
+  //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
+  //   printAltitudeData();
+#ifdef sdcard
+  log_data();
+#endif
+
 #ifdef m8nGPS
 // print_gps_data();
 #endif
@@ -1030,7 +1054,7 @@ void getDesState()
   }
   roll_des = (channel_2_pwm - 1500.0) / 500.0;  // Between -1 and 1
   pitch_des = (channel_3_pwm - 1500.0) / 500.0; // Between -1 and 1
-  yaw_des = (channel_4_pwm - 1230.0) / 500.0;   // Between -1 and 1
+  yaw_des = (channel_4_pwm - 1225.0) / 500.0;   // Between -1 and 1
   roll_passthru = roll_des / 2.0;               // Between -0.5 and 0.5
   pitch_passthru = pitch_des / 2.0;             // Between -0.5 and 0.5
   yaw_passthru = yaw_des / 2.0;                 // Between -0.5 and 0.5
@@ -1622,8 +1646,19 @@ void throttleCut()
    * called before commandMotors() is called so that the last thing checked is if the user is giving permission to command
    * the motors to anything other than minimum value. Safety first.
    */
+
   if (channel_5_pwm < 1500)
   {
+#ifdef sdcard
+    if (error_occured)
+      error_occured = false;
+    if (file_opened)
+    {
+      file_opened = false;
+      Serial.print("Closed logfile");
+      logfile.close();
+    }
+#endif
     m1_command_PWM = 120;
     m2_command_PWM = 120;
     m3_command_PWM = 120;
@@ -1639,6 +1674,28 @@ void throttleCut()
     // s5_command_PWM = 0;
     // s6_command_PWM = 0;
     // s7_command_PWM = 0;
+  }
+  else
+  {
+
+#ifdef sdcard
+    if (!file_opened && !error_occured)
+    {
+      file_opened = true;
+      logfile = SD.open("log.txt", FILE_WRITE);
+      if (logfile)
+      {
+        error_occured = false;
+        Serial.print("Opened logfile");
+        logfile.println("Arming");
+      }
+      else
+      { // if the file didn't open, print an error:
+        error_occured = true;
+        Serial.println("error opening logfile");
+      }
+    }
+#endif
   }
 }
 
@@ -1791,6 +1848,56 @@ void setupBlink(int numBlinks, int upTime, int downTime)
   }
 }
 
+#ifdef sdcard
+void log_data()
+{
+  if (current_time - last_log_time < 10000)
+    return;
+  last_log_time = micros();
+  if (file_opened && !error_occured)
+  {
+    logfile.print(F("CH1: "));
+    logfile.print(channel_1_pwm);
+    logfile.print(F(" CH2: "));
+    logfile.print(channel_2_pwm);
+    logfile.print(F(" CH3: "));
+    logfile.print(channel_3_pwm);
+    logfile.print(F(" CH4: "));
+    logfile.print(channel_4_pwm);
+    logfile.print(F(" CH5: "));
+    logfile.print(channel_5_pwm);
+    logfile.print(F(" CH6: "));
+    logfile.print(channel_6_pwm);
+
+    logfile.print(F(" thro_des: "));
+    logfile.print(thro_des);
+    logfile.print(F(" roll_des: "));
+    logfile.print(roll_des);
+    logfile.print(F(" pitch_des: "));
+    logfile.print(pitch_des);
+    logfile.print(F(" yaw_des: "));
+    logfile.print(yaw_des);
+
+    logfile.print(F(" m1_command: "));
+    logfile.print(m1_command_PWM);
+    logfile.print(F(" m2_command: "));
+    logfile.print(m2_command_PWM);
+    logfile.print(F(" m3_command: "));
+    logfile.print(m3_command_PWM);
+    logfile.print(F(" m4_command: "));
+    logfile.print(m4_command_PWM);
+    logfile.print(F(" m5_command: "));
+    logfile.print(m5_command_PWM);
+    logfile.print(F(" m6_command: "));
+    logfile.print(m6_command_PWM);
+
+    logfile.print(" Altitude from BMP280 is ");
+    logfile.print(altitude_of_quad_from_BMP);
+    logfile.print(" Flight mode : ");
+    logfile.println(flight_mode ? "Altitudehold" : "Stabalize");
+  }
+}
+#endif
 void printRadioData()
 {
   if (current_time - print_counter > 10000)
@@ -2021,7 +2128,7 @@ void checkFlightMode()
   if (channel_6_pwm > 1500)
   {
     flight_mode = ALTITUDE_HOLD_AUTO;
-    digitalWrite(mux_pin, HIGH);
+    // digitalWrite(mux_pin, HIGH);
   }
   else
   {
