@@ -287,6 +287,7 @@ PWMServo servo7;
 double altitude_of_quad_from_BMP = 0;
 double altitude_throttle_prev = 0;
 byte flight_mode = STABILIZE;
+bool is_armed = false;
 
 double normalize_pressure = 978.2;
 
@@ -1156,7 +1157,7 @@ void controlANGLE()
 
   if (flight_mode == ALTITUDE_HOLD_AUTO)
   {
-    if (channel_5_pwm < 1500)
+    if (!is_armed)
     {
       integral_throttle_prev = STARTING_THROTTLE;
     }
@@ -1452,12 +1453,12 @@ void failSafe()
   int check6 = 0;
 
   // Triggers for failure criteria
-  //  if (channel_1_pwm > maxVal || channel_1_pwm < minVal) check1 = 1;
-  //  if (channel_2_pwm > maxVal || channel_2_pwm < minVal) check2 = 1;
-  //  if (channel_3_pwm > maxVal || channel_3_pwm < minVal) check3 = 1;
-  //  if (channel_4_pwm > maxVal || channel_4_pwm < minVal) check4 = 1;
-  //  if (channel_5_pwm > maxVal || channel_5_pwm < minVal) check5 = 1;
-  //  if (channel_6_pwm > maxVal || channel_6_pwm < minVal) check6 = 1;
+   if (channel_1_pwm > maxVal || channel_1_pwm < minVal) check1 = 1;
+   if (channel_2_pwm > maxVal || channel_2_pwm < minVal) check2 = 1;
+   if (channel_3_pwm > maxVal || channel_3_pwm < minVal) check3 = 1;
+   if (channel_4_pwm > maxVal || channel_4_pwm < minVal) check4 = 1;
+   if (channel_5_pwm > maxVal || channel_5_pwm < minVal) check5 = 1;
+   if (channel_6_pwm > maxVal || channel_6_pwm < minVal) check6 = 1;
 
   // If any failures, set to default failsafe values
   if ((check1 + check2 + check3 + check4 + check5 + check6) > 0)
@@ -1700,7 +1701,7 @@ void throttleCut()
     m4_command_PWM = 120;
     m5_command_PWM = 120;
     m6_command_PWM = 120;
-
+    is_armed = false;
     // Uncomment if using servo PWM variables to control motor ESCs
     // s1_command_PWM = 0;
     // s2_command_PWM = 0;
@@ -1712,6 +1713,7 @@ void throttleCut()
   }
   else
   {
+    is_armed = true;
   }
 }
 
@@ -1873,7 +1875,7 @@ void setupBlink(int numBlinks, int upTime, int downTime)
 #ifdef sdcard
 void log_data()
 {
-  if (channel_5_pwm < 1500)
+  if (!is_armed)
   {
     if (error_occured)
       error_occured = false;
