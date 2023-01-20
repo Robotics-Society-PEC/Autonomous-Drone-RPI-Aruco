@@ -47,6 +47,9 @@ pip install --upgrade --force-reinstall <package_name>
  sudo apt install libcblas-dev libhdf5-dev libhdf5-serial-dev libatlas-base-dev libjasper-dev 
  ```
 
+## Important Points to note
+- The failsafe inside teensy is disabled
+
 ## Tasks
 
 - [X] get altitude from Raspberry pi to teensy(i2c)(needs to be used)
@@ -58,10 +61,13 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] Electromagnet Test
 - [X] multi Aruco Support
 - [ ] Landing test
-- [ ] Searching Algorythm in main code
+- [ ] Searching algorithm in main code
 - [ ] Calibration of mag needs to be done
 - [ ] Fix Altitude Problems (Altitude shouldn't go negative)
 - [ ] Add low pass filter
+- [ ] Change arming sequence according to teensy 4.1
+- [ ] i2c communciation between rpi and teensy 4.1
+- [ ] 
 
 ## Our Teams Members
 
