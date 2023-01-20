@@ -205,13 +205,12 @@ float MagScaleY = 1.0;
 float MagScaleZ = 1.0;
 
 // IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
-
-float AccErrorX = 0.08;
-float AccErrorY = -0.05;
-float AccErrorZ = 0.11;
-float GyroErrorX = 2.14;
-float GyroErrorY = 3.51;
-float GyroErrorZ = -5.33;
+float AccErrorX = -0.02;
+float AccErrorY = 0.03;
+float AccErrorZ = 0.09;
+float GyroErrorX = 2.19;
+float GyroErrorY = 2.18;
+float GyroErrorZ = -5.61;
 
 // Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;  // Integrator saturation level, mostly for safety (default 25.0)
@@ -239,11 +238,8 @@ float Kp_pitch_rate = 0.2;    // Pitch P-gain - rate mode
 float Ki_pitch_rate = 0.20;   // Pitch I-gain - rate mode
 float Kd_pitch_rate = 0.0008; // Pitch D-gain - rate mode (be careful when increasing too high, motors will begin to overheat!)
 
-// float Kp_yaw = 0.1; // Yaw P-gain
-// float Ki_yaw = 0.1; // Yaw I-gain
-// float Kd_yaw = 0.0; // Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
-float Kp_yaw = 0.0; // Yaw P-gain
-float Ki_yaw = 0.0; // Yaw I-gain
+float Kp_yaw = 0.1; // Yaw P-gain
+float Ki_yaw = 0.1; // Yaw I-gain
 float Kd_yaw = 0.0; // Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
 
 //========================================================================================================================//
@@ -372,7 +368,7 @@ void setup()
 #ifdef BMP280
   delay(1000);
   unsigned status;
-  status = bmp.begin(0x76);
+  status = bmp.begin(0x77);
   if (!status)
   {
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
@@ -445,7 +441,7 @@ void setup()
   delay(5);
 
   // Get IMU error to zero accelerometer and gyro readings, assuming vehicle is level when powered up
-  // calculate_IMU_error(); //Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
+  // calculate_IMU_error(); // Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
 
   // Arm servo channels
   servo1.write(0); // Command servo angle from 0-180 degrees (1000 to 2000 PWM)
@@ -498,7 +494,7 @@ void loop()
   loopBlink(); // Indicate we are in main loop with short blink every 1.5 seconds
 
   // Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
-  // printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
+  printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
   // printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
@@ -725,10 +721,16 @@ void getIMUdata()
   GyroY_prev = GyroY;
   GyroZ_prev = GyroZ;
 
-  // Magnetometer
+// Magnetometer
+#ifdef USE_MPU9250_SPI
   MagX = MgX / 6.0; // uT
   MagY = MgY / 6.0;
   MagZ = MgZ / 6.0;
+#elif defined compass
+  MagX = MgX / 1.0; // uT
+  MagY = MgY / 1.0;
+  MagZ = MgZ / 1.0;
+#endif
 
   // Correct the outputs with the calculated error values
   MagX = (MagX - MagErrorX) * MagScaleX;
@@ -1893,6 +1895,7 @@ void log_data()
       {
         error_occured = false;
         Serial.print("Opened logfile");
+        logfile.print(F("TIME: ,"));
         logfile.print(F("CH1: ,"));
         logfile.print(F("    CH2: ,"));
         logfile.print(F("    CH3: ,"));
@@ -1907,6 +1910,9 @@ void log_data()
         logfile.print(F("    m2_command: ,"));
         logfile.print(F("    m3_command: ,"));
         logfile.print(F("    m4_command: ,"));
+        logfile.print(F(" GyroX: ,"));
+        logfile.print(F(" GyroY: ,"));
+        logfile.print(F(" GyroZ: ,"));
         logfile.print("    Altitude from BMP280 : ,");
         logfile.print("    Flight mode : ,");
         logfile.println("    Heading : ,");
@@ -1924,7 +1930,8 @@ void log_data()
     last_log_time = micros();
     if (file_opened && !error_occured)
     {
-
+      logfile.print(millis() / 1000.0);
+      logfile.print(",");
       logfile.print(channel_1_pwm);
       logfile.print(",");
       logfile.print(channel_2_pwm);
@@ -1936,7 +1943,7 @@ void log_data()
       logfile.print(channel_5_pwm);
       logfile.print(",");
       logfile.print(channel_6_pwm);
-      logfile.print(",");
+      logfile.print(",  ");
       logfile.print(thro_des);
       logfile.print(",");
       logfile.print(roll_des);
@@ -1944,7 +1951,7 @@ void log_data()
       logfile.print(pitch_des);
       logfile.print(",");
       logfile.print(yaw_des);
-      logfile.print(",");
+      logfile.print(",  ");
       logfile.print(m1_command_PWM);
       logfile.print(",");
       logfile.print(m2_command_PWM);
@@ -1952,11 +1959,17 @@ void log_data()
       logfile.print(m3_command_PWM);
       logfile.print(",");
       logfile.print(m4_command_PWM);
+      logfile.print(",  ");
+      logfile.print(GyroX);
       logfile.print(",");
+      logfile.print(GyroY);
+      logfile.print(",");
+      logfile.print(GyroZ);
+      logfile.print(",  ");
       logfile.print(altitude_of_quad_from_BMP);
-      logfile.print(",");
+      logfile.print(",  ");
       logfile.print(flight_mode ? "Altitudehold" : "Stabalize");
-      logfile.print(",");
+      logfile.print(",  ");
       logfile.println(heading_degrees_from_compass);
     }
   }

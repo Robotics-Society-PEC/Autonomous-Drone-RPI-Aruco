@@ -60,6 +60,8 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] Landing test
 - [ ] Searching Algorythm in main code
 - [ ] Calibration of mag needs to be done
+- [ ] Fix Altitude Problems (Altitude shouldn't go negative)
+- [ ] Add low pass filter
 
 ## Our Teams Members
 
