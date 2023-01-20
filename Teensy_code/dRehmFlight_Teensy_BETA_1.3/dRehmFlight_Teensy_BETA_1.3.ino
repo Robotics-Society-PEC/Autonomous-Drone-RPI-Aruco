@@ -229,8 +229,11 @@ float Kp_pitch_rate = 0.2;    // Pitch P-gain - rate mode
 float Ki_pitch_rate = 0.20;   // Pitch I-gain - rate mode
 float Kd_pitch_rate = 0.0008; // Pitch D-gain - rate mode (be careful when increasing too high, motors will begin to overheat!)
 
-float Kp_yaw = 0.1; // Yaw P-gain
-float Ki_yaw = 0.1; // Yaw I-gain
+// float Kp_yaw = 0.1; // Yaw P-gain
+// float Ki_yaw = 0.1; // Yaw I-gain
+// float Kd_yaw = 0.0; // Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
+float Kp_yaw = 0.0; // Yaw P-gain
+float Ki_yaw = 0.0; // Yaw I-gain
 float Kd_yaw = 0.0; // Yaw D-gain (be careful when increasing too high, motors will begin to overheat!)
 
 //========================================================================================================================//
@@ -323,10 +326,11 @@ float thro_des, roll_des, pitch_des, yaw_des;
 float roll_passthru, pitch_passthru, yaw_passthru;
 
 // Controller:
+#define STARTING_THROTTLE 0.40 / 0.01 / Ki_throttle
 float error_roll, error_roll_prev, roll_des_prev, integral_roll, integral_roll_il, integral_roll_ol, integral_roll_prev, integral_roll_prev_il, integral_roll_prev_ol, derivative_roll, roll_PID = 0;
 float error_pitch, error_pitch_prev, pitch_des_prev, integral_pitch, integral_pitch_il, integral_pitch_ol, integral_pitch_prev, integral_pitch_prev_il, integral_pitch_prev_ol, derivative_pitch, pitch_PID = 0;
 float error_yaw, error_yaw_prev, integral_yaw, integral_yaw_prev, derivative_yaw, yaw_PID = 0;
-float error_throttle, error_throttle_prev, integral_throttle, integral_throttle_prev = 0.40 / 0.01 / Ki_throttle, derivative_throttle, throttle_PID = 0;
+float error_throttle, error_throttle_prev, integral_throttle, integral_throttle_prev = STARTING_THROTTLE, derivative_throttle, throttle_PID = 0;
 
 // Mixer
 float m1_command_scaled, m2_command_scaled, m3_command_scaled, m4_command_scaled, m5_command_scaled, m6_command_scaled;
@@ -1116,20 +1120,27 @@ void controlANGLE()
   derivative_yaw = (error_yaw - error_yaw_prev) / dt;
   yaw_PID = .01 * (Kp_yaw * error_yaw + Ki_yaw * integral_yaw + Kd_yaw * derivative_yaw); // Scaled by .01 to bring within -1 to 1 range
 
-  if (abs(altitude_of_quad_from_BMP - altitude_to_achieve) > 0.5)
+  if (flight_mode == ALTITUDE_HOLD_AUTO)
   {
+    if (channel_5_pwm < 1500)
+    {
+      integral_throttle_prev = STARTING_THROTTLE;
+    }
     error_throttle = altitude_to_achieve - altitude_of_quad_from_BMP;
-    integral_throttle = integral_throttle_prev + error_throttle * dt;
-
-    derivative_throttle = (error_throttle - error_throttle_prev) / dt;                                                          // what does gyro give
-    throttle_PID = 0.01 * (Kp_throttle * error_throttle + Ki_throttle * integral_throttle + Kd_throttle * derivative_throttle); // Scaled by .01 to bring within -1 to 1 range
-
-    // Update Throttle variables
-    integral_throttle_prev = integral_throttle;
     altitude_throttle_prev = altitude_of_quad_from_BMP;
     error_throttle_prev = error_throttle;
-  }
+    if (abs(altitude_of_quad_from_BMP - altitude_to_achieve) > 0.5)
+    {
 
+      integral_throttle = integral_throttle_prev + error_throttle * dt;
+
+      derivative_throttle = (error_throttle - error_throttle_prev) / dt;                                                          // what does gyro give
+      throttle_PID = 0.01 * (Kp_throttle * error_throttle + Ki_throttle * integral_throttle + Kd_throttle * derivative_throttle); // Scaled by .01 to bring within -1 to 1 range
+
+      // Update Throttle variables
+      integral_throttle_prev = integral_throttle;
+    }
+  }
   // Update roll variables
   integral_roll_prev = integral_roll;
   // Update pitch variables
@@ -1299,12 +1310,12 @@ void scaleCommands()
   m5_command_PWM = m5_command_scaled * 125 + 125;
   m6_command_PWM = m6_command_scaled * 125 + 125;
   // Constrain commands to motors within oneshot125 bounds
-  m1_command_PWM = constrain(m1_command_PWM, 125, 250);
-  m2_command_PWM = constrain(m2_command_PWM, 125, 250);
-  m3_command_PWM = constrain(m3_command_PWM, 125, 250);
-  m4_command_PWM = constrain(m4_command_PWM, 125, 250);
-  m5_command_PWM = constrain(m5_command_PWM, 125, 250);
-  m6_command_PWM = constrain(m6_command_PWM, 125, 250);
+  m1_command_PWM = constrain(m1_command_PWM, 125, 240);
+  m2_command_PWM = constrain(m2_command_PWM, 125, 240);
+  m3_command_PWM = constrain(m3_command_PWM, 125, 240);
+  m4_command_PWM = constrain(m4_command_PWM, 125, 240);
+  m5_command_PWM = constrain(m5_command_PWM, 125, 240);
+  m6_command_PWM = constrain(m6_command_PWM, 125, 240);
 
   // Scaled to 0-180 for servo library
   s1_command_PWM = s1_command_scaled * 180;
@@ -1649,16 +1660,6 @@ void throttleCut()
 
   if (channel_5_pwm < 1500)
   {
-#ifdef sdcard
-    if (error_occured)
-      error_occured = false;
-    if (file_opened)
-    {
-      file_opened = false;
-      Serial.print("Closed logfile");
-      logfile.close();
-    }
-#endif
     m1_command_PWM = 120;
     m2_command_PWM = 120;
     m3_command_PWM = 120;
@@ -1677,25 +1678,6 @@ void throttleCut()
   }
   else
   {
-
-#ifdef sdcard
-    if (!file_opened && !error_occured)
-    {
-      file_opened = true;
-      logfile = SD.open("log.txt", FILE_WRITE);
-      if (logfile)
-      {
-        error_occured = false;
-        Serial.print("Opened logfile");
-        logfile.println("Arming");
-      }
-      else
-      { // if the file didn't open, print an error:
-        error_occured = true;
-        Serial.println("error opening logfile");
-      }
-    }
-#endif
   }
 }
 
@@ -1851,50 +1833,91 @@ void setupBlink(int numBlinks, int upTime, int downTime)
 #ifdef sdcard
 void log_data()
 {
-  if (current_time - last_log_time < 10000)
-    return;
-  last_log_time = micros();
-  if (file_opened && !error_occured)
+  if (channel_5_pwm < 1500)
   {
-    logfile.print(F("CH1: "));
-    logfile.print(channel_1_pwm);
-    logfile.print(F(" CH2: "));
-    logfile.print(channel_2_pwm);
-    logfile.print(F(" CH3: "));
-    logfile.print(channel_3_pwm);
-    logfile.print(F(" CH4: "));
-    logfile.print(channel_4_pwm);
-    logfile.print(F(" CH5: "));
-    logfile.print(channel_5_pwm);
-    logfile.print(F(" CH6: "));
-    logfile.print(channel_6_pwm);
+    if (error_occured)
+      error_occured = false;
+    if (file_opened)
+    {
+      file_opened = false;
+      Serial.print("Closed logfile");
+      logfile.close();
+    }
+  }
+  else
+  {
 
-    logfile.print(F(" thro_des: "));
-    logfile.print(thro_des);
-    logfile.print(F(" roll_des: "));
-    logfile.print(roll_des);
-    logfile.print(F(" pitch_des: "));
-    logfile.print(pitch_des);
-    logfile.print(F(" yaw_des: "));
-    logfile.print(yaw_des);
+    if (!file_opened && !error_occured)
+    {
+      file_opened = true;
+      logfile = SD.open("log1.txt", FILE_WRITE);
+      if (logfile)
+      {
+        error_occured = false;
+        Serial.print("Opened logfile");
+        logfile.print(F("CH1: ,"));
+        logfile.print(F("    CH2: ,"));
+        logfile.print(F("    CH3: ,"));
+        logfile.print(F("    CH4: ,"));
+        logfile.print(F("    CH5: ,"));
+        logfile.print(F("    CH6: ,"));
+        logfile.print(F("    thro_des: ,"));
+        logfile.print(F("    roll_des: ,"));
+        logfile.print(F("    pitch_des: ,"));
+        logfile.print(F("    yaw_des: ,"));
+        logfile.print(F("    m1_command: ,"));
+        logfile.print(F("    m2_command: ,"));
+        logfile.print(F("    m3_command: ,"));
+        logfile.print(F("    m4_command: ,"));
+        logfile.print("    Altitude from BMP280 : ,");
+        logfile.println("    Flight mode : ,");
+      }
+      else
+      { // if the file didn't open, print an error:
+        error_occured = true;
+        Serial.println("error opening logfile");
+      }
+    }
 
-    logfile.print(F(" m1_command: "));
-    logfile.print(m1_command_PWM);
-    logfile.print(F(" m2_command: "));
-    logfile.print(m2_command_PWM);
-    logfile.print(F(" m3_command: "));
-    logfile.print(m3_command_PWM);
-    logfile.print(F(" m4_command: "));
-    logfile.print(m4_command_PWM);
-    logfile.print(F(" m5_command: "));
-    logfile.print(m5_command_PWM);
-    logfile.print(F(" m6_command: "));
-    logfile.print(m6_command_PWM);
+    if (current_time - last_log_time < 10000) // print at 100 hz
+      return;
 
-    logfile.print(" Altitude from BMP280 is ");
-    logfile.print(altitude_of_quad_from_BMP);
-    logfile.print(" Flight mode : ");
-    logfile.println(flight_mode ? "Altitudehold" : "Stabalize");
+    last_log_time = micros();
+    if (file_opened && !error_occured)
+    {
+
+      logfile.print(channel_1_pwm);
+      logfile.print(",");
+      logfile.print(channel_2_pwm);
+      logfile.print(",");
+      logfile.print(channel_3_pwm);
+      logfile.print(",");
+      logfile.print(channel_4_pwm);
+      logfile.print(",");
+      logfile.print(channel_5_pwm);
+      logfile.print(",");
+      logfile.print(channel_6_pwm);
+      logfile.print(",");
+      logfile.print(thro_des);
+      logfile.print(",");
+      logfile.print(roll_des);
+      logfile.print(",");
+      logfile.print(pitch_des);
+      logfile.print(",");
+      logfile.print(yaw_des);
+      logfile.print(",");
+      logfile.print(m1_command_PWM);
+      logfile.print(",");
+      logfile.print(m2_command_PWM);
+      logfile.print(",");
+      logfile.print(m3_command_PWM);
+      logfile.print(",");
+      logfile.print(m4_command_PWM);
+      logfile.print(",");
+      logfile.print(altitude_of_quad_from_BMP);
+      logfile.print(",");
+      logfile.println(flight_mode ? "Altitudehold" : "Stabalize");
+    }
   }
 }
 #endif
