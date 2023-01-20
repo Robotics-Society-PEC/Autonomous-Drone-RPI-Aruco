@@ -29,6 +29,7 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 //========================================================================================================================//
 // #define BLUETOOTH_EN
 // #define m8nGPS
+#define compass
 #define sdcard
 #define BMP280
 #define mux_pin 32
@@ -76,12 +77,14 @@ File logfile;
 #include <Adafruit_BMP280.h>
 Adafruit_BMP280 bmp;
 #endif
-
+#ifdef compass
+#include <Adafruit_Sensor.h>
+#include <Adafruit_HMC5883_U.h>
+Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
+#endif
 #ifdef m8nGPS
 #include <TinyGPS++.h>
 TinyGPSPlus gps;
-volatile float minutes, seconds;
-volatile int degree, secs, mins;
 #endif
 
 #if defined USE_SBUS_RX
@@ -169,6 +172,13 @@ double lat_val = 0, lng_val = 0, altitude_of_quad_from_GPS = 0;
 uint8_t hr_val, min_val, sec_val; // time in mins / hrs / seconds
 uint32_t sats_val, gps_hdop;
 bool loc_valid = false, alt_valid = false, time_valid = false;
+unsigned long time_since_last_gps;
+volatile float minutes, seconds;
+volatile int degree, secs, mins;
+#endif
+#ifdef compass
+float heading_degrees_from_compass = 0;
+unsigned long time_since_last_heading_from_compass;
 #endif
 double altitude_to_achieve = 1;
 
@@ -286,7 +296,7 @@ double normalize_pressure = 978.2;
 
 float dt;
 unsigned long current_time, prev_time;
-unsigned long print_counter, serial_counter, time_since_last_altitude, time_since_last_gps;
+unsigned long print_counter, serial_counter, time_since_last_altitude;
 #ifdef sdcard
 unsigned long last_log_time;
 #endif
@@ -326,7 +336,7 @@ float thro_des, roll_des, pitch_des, yaw_des;
 float roll_passthru, pitch_passthru, yaw_passthru;
 
 // Controller:
-#define STARTING_THROTTLE 0.40 / 0.01 / Ki_throttle
+#define STARTING_THROTTLE 0.50 / 0.01 / Ki_throttle
 float error_roll, error_roll_prev, roll_des_prev, integral_roll, integral_roll_il, integral_roll_ol, integral_roll_prev, integral_roll_prev_il, integral_roll_prev_ol, derivative_roll, roll_PID = 0;
 float error_pitch, error_pitch_prev, pitch_des_prev, integral_pitch, integral_pitch_il, integral_pitch_ol, integral_pitch_prev, integral_pitch_prev_il, integral_pitch_prev_ol, derivative_pitch, pitch_PID = 0;
 float error_yaw, error_yaw_prev, integral_yaw, integral_yaw_prev, derivative_yaw, yaw_PID = 0;
@@ -381,6 +391,15 @@ void setup()
   calibrateForAltitude();                           // ALtitude
 #endif
 
+#ifdef compass
+  if (!mag.begin())
+  {
+    /* There was a problem detecting the HMC5883 ... check your connections */
+    Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
+    while (1)
+      ;
+  }
+#endif
 #ifdef m8nGPS
   Serial5.begin(9600); /* Define baud rate for software serial communication */
   Serial.println("Initializing GPS");
@@ -456,6 +475,9 @@ void setup()
 
   // If using MPU9250 IMU, uncomment for one-time magnetometer calibration (may need to repeat for new locations)
   // calibrateMagnetometer(); //Generates magentometer error and scale factors to be pasted in user-specified variables section
+
+  // if using compass then also uncomment this calibrate magnometer
+
   Wire1.setSDA(17);
   Wire1.setSCL(16);
   Wire1.begin(0x44);
@@ -477,7 +499,7 @@ void loop()
 
   // Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   // printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
-  printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
+  // printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //  printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
@@ -487,6 +509,7 @@ void loop()
   //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
   //   printAltitudeData();
+
 #ifdef sdcard
   log_data();
 #endif
@@ -494,6 +517,10 @@ void loop()
 #ifdef m8nGPS
 // print_gps_data();
 #endif
+
+  // #ifdef compass
+  //   get_heading();
+  // #endif
   //  printFlightMode();
   //  Get vehicle state
   getIMUdata();                                                              // Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
@@ -656,10 +683,14 @@ void getIMUdata()
    */
   int16_t AcX, AcY, AcZ, GyX, GyY, GyZ, MgX, MgY, MgZ;
 
-#if defined USE_MPU6050_I2C
+#if defined USE_MPU6050_I2C && defined compass
   mpu6050.getMotion6(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ);
+  get_heading(&MgX, &MgY, &MgZ);
+
 #elif defined USE_MPU9250_SPI
   mpu9250.getMotion9(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ, &MgX, &MgY, &MgZ);
+#elif defined USE_MPU6050_I2C
+  mpu6050.getMotion6(&AcX, &AcY, &AcZ, &GyX, &GyY, &GyZ);
 #endif
 
   // Accelerometer
@@ -698,6 +729,7 @@ void getIMUdata()
   MagX = MgX / 6.0; // uT
   MagY = MgY / 6.0;
   MagZ = MgZ / 6.0;
+
   // Correct the outputs with the calculated error values
   MagX = (MagX - MagErrorX) * MagScaleX;
   MagY = (MagY - MagErrorY) * MagScaleY;
@@ -1058,7 +1090,7 @@ void getDesState()
   }
   roll_des = (channel_2_pwm - 1500.0) / 500.0;  // Between -1 and 1
   pitch_des = (channel_3_pwm - 1500.0) / 500.0; // Between -1 and 1
-  yaw_des = (channel_4_pwm - 1225.0) / 500.0;   // Between -1 and 1
+  yaw_des = (channel_4_pwm - 1500.0) / 500.0;   // Between -1 and 1
   roll_passthru = roll_des / 2.0;               // Between -0.5 and 0.5
   pitch_passthru = pitch_des / 2.0;             // Between -0.5 and 0.5
   yaw_passthru = yaw_des / 2.0;                 // Between -0.5 and 0.5
@@ -1765,7 +1797,13 @@ void calibrateMagnetometer()
 
   while (1)
     ; // Halt code so it won't enter main loop until this function commented out
+#elif defined compass
+  // DOOOOO SOMETHINGGGGGGGGG]
+  Serial.println("magnometer callibration not implemented");
+  while (1)
+    ;
 #endif
+
 #ifdef BLUETOOTH_EN
   Serial8.println("Error: MPU9250 not selected. Cannot calibrate non-existent magnetometer.");
 #endif
@@ -1870,7 +1908,8 @@ void log_data()
         logfile.print(F("    m3_command: ,"));
         logfile.print(F("    m4_command: ,"));
         logfile.print("    Altitude from BMP280 : ,");
-        logfile.println("    Flight mode : ,");
+        logfile.print("    Flight mode : ,");
+        logfile.println("    Heading : ,");
       }
       else
       { // if the file didn't open, print an error:
@@ -1916,7 +1955,9 @@ void log_data()
       logfile.print(",");
       logfile.print(altitude_of_quad_from_BMP);
       logfile.print(",");
-      logfile.println(flight_mode ? "Altitudehold" : "Stabalize");
+      logfile.print(flight_mode ? "Altitudehold" : "Stabalize");
+      logfile.print(",");
+      logfile.println(heading_degrees_from_compass);
     }
   }
 }
@@ -2025,6 +2066,58 @@ void calibrateForAltitude()
   // get altitude from sensor
   Serial.println("Calibration Done");
 }
+#endif
+#ifdef compass
+void get_heading(int16_t *MgX, int16_t *MgY, int16_t *MgZ)
+{
+  if (current_time - time_since_last_heading_from_compass < 10000) // 100 hz = 10000
+  {
+
+    return;
+  }
+
+  time_since_last_heading_from_compass = micros();
+
+  sensors_event_t event;
+  mag.getEvent(&event);
+
+  // /* Display the results (magnetic vector values are in micro-Tesla (uT)) */
+  // Serial.print("X: ");
+  // Serial.print(event.magnetic.x);
+  // Serial.print("  ");
+  // Serial.print("Y: ");
+  // Serial.print(event.magnetic.y);
+  // Serial.print("  ");
+  // Serial.print("Z: ");
+  // Serial.print(event.magnetic.z);
+  // Serial.print("  ");
+  // Serial.println("uT");
+  // Hold the module so that Z is pointing 'up' and you can measure the heading with x&y
+  // Calculate heading when the magnetometer is level, then correct for signs of axis.
+  float heading = atan2(event.magnetic.y, event.magnetic.x);
+
+  // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
+  // Find yours here: http://www.magnetic-declination.com/
+  // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
+  // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
+  float declinationAngle = 0.0303; // chandigarh
+  heading += declinationAngle;
+
+  // Correct for when signs are reversed.
+  if (heading < 0)
+    heading += 2 * PI;
+
+  // Check for wrap due to addition of declination.
+  if (heading > 2 * PI)
+    heading -= 2 * PI;
+
+  // Convert radians to degrees for readability.
+  heading_degrees_from_compass = heading * 180 / M_PI;
+  *MgX = event.magnetic.x;
+  *MgY = event.magnetic.y;
+  *MgZ = event.magnetic.z;
+}
+
 #ifdef m8nGPS
 void get_data_from_GPS()
 {

@@ -49,17 +49,17 @@ pip install --upgrade --force-reinstall <package_name>
 
 ## Tasks
 
-- [ ] get altitude from Raspberry pi to teensy(i2c)
-- [ ] PID for throttle using Altitude
+- [X] get altitude from Raspberry pi to teensy(i2c)(needs to be used)
+- [X] PID for throttle using Altitude
 - [X] get altitude from BMP 280
-- [ ] write code for mux(currenlty in altitude hold mode the pitch yaw and roll is manual)
-- [ ] GPS (optional)
-- [ ] SD Card Log Support (optional)
+- [X] write code for mux(currenlty in altitude hold mode the pitch yaw and roll is manual)
+- [X] GPS (optional)
+- [X] SD Card Log Support (optional)
 - [ ] Electromagnet Test
-- [ ] multi Aruco Support
+- [X] multi Aruco Support
 - [ ] Landing test
 - [ ] Searching Algorythm in main code
-
+- [ ] Calibration of mag needs to be done
 
 ## Our Teams Members
 
