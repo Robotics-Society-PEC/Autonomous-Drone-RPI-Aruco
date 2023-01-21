@@ -180,7 +180,7 @@ volatile int degree, secs, mins;
 float heading_degrees_from_compass = 0;
 unsigned long time_since_last_heading_from_compass;
 #endif
-double altitude_to_achieve = 1;
+double altitude_to_achieve = 4; // in metres
 
 // Radio failsafe values for every channel in the event that bad reciever data is detected. Recommended defaults:
 unsigned long channel_1_fs = 1000; // thro
@@ -212,21 +212,22 @@ float GyroErrorX = 2.19;
 float GyroErrorY = 2.18;
 float GyroErrorZ = -5.61;
 
+
 // Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;  // Integrator saturation level, mostly for safety (default 25.0)
 float maxRoll = 50.0;  // Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
 float maxPitch = 50.0; // Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
 float maxYaw = 160.0;  // Max yaw rate in deg/sec
 
-float Kp_throttle = 0.3;  // Throttle P-gain - angle mode
+float Kp_throttle = 0.2;  // Throttle P-gain - angle mode
 float Ki_throttle = 0.35; // Throttle I-gain - angle mode
-float Kd_throttle = 0.4;  // Throttle D-gain - angle mode (has no effect on controlANGLE2)
+float Kd_throttle = 0.15;  // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
-float Kp_roll_angle = 0.1;   // Roll P-gain - angle mode
+float Kp_roll_angle = 0.2;   // Roll P-gain - angle mode
 float Ki_roll_angle = 0.3;   // Roll I-gain - angle mode
 float Kd_roll_angle = 0.15;  // Roll D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_roll = 0.9;     // Roll damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
-float Kp_pitch_angle = 0.1;  // Pitch P-gain - angle mode
+float Kp_pitch_angle = 0.2;  // Pitch P-gain - angle mode
 float Ki_pitch_angle = 0.3;  // Pitch I-gain - angle mode
 float Kd_pitch_angle = 0.15; // Pitch D-gain - angle mode (has no effect on controlANGLE2)
 float B_loop_pitch = 0.9;    // Pitch damping term for controlANGLE2(), lower is more damping (must be between 0 to 1)
@@ -333,7 +334,7 @@ float thro_des, roll_des, pitch_des, yaw_des;
 float roll_passthru, pitch_passthru, yaw_passthru;
 
 // Controller:
-#define STARTING_THROTTLE 0.50 / 0.01 / Ki_throttle
+#define STARTING_THROTTLE 0.55 / 0.01 / Ki_throttle
 float error_roll, error_roll_prev, roll_des_prev, integral_roll, integral_roll_il, integral_roll_ol, integral_roll_prev, integral_roll_prev_il, integral_roll_prev_ol, derivative_roll, roll_PID = 0;
 float error_pitch, error_pitch_prev, pitch_des_prev, integral_pitch, integral_pitch_il, integral_pitch_ol, integral_pitch_prev, integral_pitch_prev_il, integral_pitch_prev_ol, derivative_pitch, pitch_PID = 0;
 float error_yaw, error_yaw_prev, integral_yaw, integral_yaw_prev, derivative_yaw, yaw_PID = 0;
@@ -1898,7 +1899,7 @@ void log_data()
     if (!file_opened && !error_occured)
     {
       file_opened = true;
-      logfile = SD.open("log1.txt", FILE_WRITE);
+      logfile = SD.open("log5.txt", FILE_WRITE);
       if (logfile)
       {
         error_occured = false;
@@ -2221,7 +2222,7 @@ void get_altitude_from_barometer()
     // Serial.println("getting Altitude");
     double temp_alt = bmp.readAltitude(normalize_pressure);
     altitude_of_quad_from_BMP = isnan(temp_alt) ? altitude_of_quad_from_BMP : temp_alt;
-    altitude_of_quad_from_BMP = constraint(altitude_of_quad_from_BMP, 0, 100);
+    altitude_of_quad_from_BMP = constrain(altitude_of_quad_from_BMP, 0, 100);
     // get altitude from sensor
   }
 }

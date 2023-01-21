@@ -67,8 +67,8 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] Add low pass filter
 - [ ] Change arming sequence according to teensy 4.1
 - [ ] i2c communciation between rpi and teensy 4.1
-
-
+- [ ] Throttle build up way to slow (need to increase)
+- [ ] Need to reduce the percentage error on the throttle build up
 ## Our Teams Members
 
 - Mansi Kalra
