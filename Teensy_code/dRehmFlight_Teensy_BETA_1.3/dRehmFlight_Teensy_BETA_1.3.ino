@@ -192,7 +192,7 @@ double altitude_from_ultrasonic;
 float heading_degrees_from_compass = 0;
 unsigned long time_since_last_heading_from_compass;
 #endif
-double altitude_to_achieve = 4; // in metres
+double altitude_to_achieve = 2; // in metres
 
 // Radio failsafe values for every channel in the event that bad reciever data is detected. Recommended defaults:
 unsigned long channel_1_fs = 1000; // thro
