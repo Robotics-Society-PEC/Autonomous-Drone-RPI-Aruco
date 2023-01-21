@@ -27,6 +27,10 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 //========================================================================================================================//
 //                                                 USER-SPECIFIED DEFINES                                                 //
 //========================================================================================================================//
+#define ASCENT_RATE 0.01
+#define DESCENT_RATE 0.01
+#define PERCENTAGE_TOLERANCE 0.1
+
 // #define BLUETOOTH_EN
 // #define m8nGPS
 #define compass
@@ -212,7 +216,6 @@ float GyroErrorX = 2.19;
 float GyroErrorY = 2.18;
 float GyroErrorZ = -5.61;
 
-
 // Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;  // Integrator saturation level, mostly for safety (default 25.0)
 float maxRoll = 50.0;  // Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
@@ -221,7 +224,7 @@ float maxYaw = 160.0;  // Max yaw rate in deg/sec
 
 float Kp_throttle = 0.2;  // Throttle P-gain - angle mode
 float Ki_throttle = 0.35; // Throttle I-gain - angle mode
-float Kd_throttle = 0.15;  // Throttle D-gain - angle mode (has no effect on controlANGLE2)
+float Kd_throttle = 0.15; // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
 float Kp_roll_angle = 0.2;   // Roll P-gain - angle mode
 float Ki_roll_angle = 0.3;   // Roll I-gain - angle mode
@@ -1163,8 +1166,7 @@ void controlANGLE()
       integral_throttle_prev = STARTING_THROTTLE;
     }
     error_throttle = altitude_to_achieve - altitude_of_quad_from_BMP;
-    altitude_throttle_prev = altitude_of_quad_from_BMP;
-    error_throttle_prev = error_throttle;
+
     if (abs(altitude_of_quad_from_BMP - altitude_to_achieve) > 0.2)
     {
 
@@ -1176,7 +1178,34 @@ void controlANGLE()
       // Update Throttle variables
       integral_throttle_prev = integral_throttle;
     }
+
+    altitude_throttle_prev = altitude_of_quad_from_BMP;
+    error_throttle_prev = error_throttle;
   }
+  // if (flight_mode == ALTITUDE_HOLD_AUTO)
+  // {
+  //   if (is_armed)
+  //   {
+
+  //     if (altitude_of_quad_from_BMP > (1 + PERCENTAGE_TOLERANCE) * altitude_to_achieve)
+  //     {
+  //       if (altitude_of_quad_from_BMP >= altitude_throttle_prev)
+  //       {
+  //         throttle_PID = throttle_PID - DESCENT_RATE;
+  //         altitude_throttle_prev = altitude_of_quad_from_BMP;
+  //       }
+  //       else if (altitude_of_quad_from_BMP < (1 - PERCENTAGE_TOLERANCE) * altitude_to_achieve)
+  //       {
+  //         if (altitude_of_quad_from_BMP <= altitude_throttle_prev)
+  //         {
+  //           throttle_PID = throttle_PID + ASCENT_RATE;
+  //           altitude_throttle_prev = altitude_of_quad_from_BMP;
+  //         }
+  //       }
+  //     }
+  //   }
+  // }
+
   // Update roll variables
   integral_roll_prev = integral_roll;
   // Update pitch variables
