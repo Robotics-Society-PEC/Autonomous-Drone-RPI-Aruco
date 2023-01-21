@@ -219,7 +219,7 @@ float maxPitch = 50.0; // Max pitch angle in degrees for angle mode (maximum ~70
 float maxYaw = 160.0;  // Max yaw rate in deg/sec
 
 float Kp_throttle = 0.3;  // Throttle P-gain - angle mode
-float Ki_throttle = 0.28; // Throttle I-gain - angle mode
+float Ki_throttle = 0.35; // Throttle I-gain - angle mode
 float Kd_throttle = 0.4;  // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
 float Kp_roll_angle = 0.1;   // Roll P-gain - angle mode
@@ -442,7 +442,7 @@ void setup()
   delay(5);
 
   // Get IMU error to zero accelerometer and gyro readings, assuming vehicle is level when powered up
-  // calculate_IMU_error(); // Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
+  calculate_IMU_error(); // Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
 
   // Arm servo channels
   servo1.write(0); // Command servo angle from 0-180 degrees (1000 to 2000 PWM)
@@ -1164,7 +1164,7 @@ void controlANGLE()
     error_throttle = altitude_to_achieve - altitude_of_quad_from_BMP;
     altitude_throttle_prev = altitude_of_quad_from_BMP;
     error_throttle_prev = error_throttle;
-    if (abs(altitude_of_quad_from_BMP - altitude_to_achieve) > 0.5)
+    if (abs(altitude_of_quad_from_BMP - altitude_to_achieve) > 0.2)
     {
 
       integral_throttle = integral_throttle_prev + error_throttle * dt;
@@ -1453,12 +1453,18 @@ void failSafe()
   int check6 = 0;
 
   // Triggers for failure criteria
-   if (channel_1_pwm > maxVal || channel_1_pwm < minVal) check1 = 1;
-   if (channel_2_pwm > maxVal || channel_2_pwm < minVal) check2 = 1;
-   if (channel_3_pwm > maxVal || channel_3_pwm < minVal) check3 = 1;
-   if (channel_4_pwm > maxVal || channel_4_pwm < minVal) check4 = 1;
-   if (channel_5_pwm > maxVal || channel_5_pwm < minVal) check5 = 1;
-   if (channel_6_pwm > maxVal || channel_6_pwm < minVal) check6 = 1;
+  if (channel_1_pwm > maxVal || channel_1_pwm < minVal)
+    check1 = 1;
+  if (channel_2_pwm > maxVal || channel_2_pwm < minVal)
+    check2 = 1;
+  if (channel_3_pwm > maxVal || channel_3_pwm < minVal)
+    check3 = 1;
+  if (channel_4_pwm > maxVal || channel_4_pwm < minVal)
+    check4 = 1;
+  if (channel_5_pwm > maxVal || channel_5_pwm < minVal)
+    check5 = 1;
+  if (channel_6_pwm > maxVal || channel_6_pwm < minVal)
+    check6 = 1;
 
   // If any failures, set to default failsafe values
   if ((check1 + check2 + check3 + check4 + check5 + check6) > 0)
@@ -2215,6 +2221,7 @@ void get_altitude_from_barometer()
     // Serial.println("getting Altitude");
     double temp_alt = bmp.readAltitude(normalize_pressure);
     altitude_of_quad_from_BMP = isnan(temp_alt) ? altitude_of_quad_from_BMP : temp_alt;
+    altitude_of_quad_from_BMP = constraint(altitude_of_quad_from_BMP, 0, 100);
     // get altitude from sensor
   }
 }
