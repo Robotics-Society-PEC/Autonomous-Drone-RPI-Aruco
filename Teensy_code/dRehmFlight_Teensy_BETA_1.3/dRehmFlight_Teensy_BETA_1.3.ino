@@ -33,6 +33,7 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 
 // #define BLUETOOTH_EN
 // #define m8nGPS
+#define HCSR04
 #define compass
 #define sdcard
 #define BMP280
@@ -180,6 +181,13 @@ unsigned long time_since_last_gps;
 volatile float minutes, seconds;
 volatile int degree, secs, mins;
 #endif
+
+#ifdef HCSR04
+#define trig_pin 6
+#define echo_pin 8
+double altitude_from_ultrasonic;
+#endif
+
 #ifdef compass
 float heading_degrees_from_compass = 0;
 unsigned long time_since_last_heading_from_compass;
@@ -370,6 +378,12 @@ void setup()
   }
 
 #endif
+
+#ifdef HCSR04
+  pinMode(trig_pin, OUTPUT);
+  pinMode(echo_pin, INPUT_PULLUP);
+#endif
+
 #ifdef BMP280
   delay(1000);
   unsigned status;
@@ -529,6 +543,9 @@ void loop()
 
 #ifdef BMP280
   get_altitude_from_barometer();
+#endif
+#ifdef HCSR04
+  get_altitude_from_ultrasonic();
 #endif
 
 #ifdef m8nGPS
@@ -2242,7 +2259,7 @@ void print_gps_data()
   }
 }
 #endif
-
+#ifdef BMP280
 void get_altitude_from_barometer()
 {
   if (current_time - time_since_last_altitude > 100000) // 10HZ
@@ -2255,6 +2272,21 @@ void get_altitude_from_barometer()
     // get altitude from sensor
   }
 }
+#endif
+
+#ifdef HCSR04
+void get_altitude_from_ultrasonic()
+{
+  unsigned long duration;
+  digitalWrite(trig_pin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trig_pin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trig_pin, LOW);
+  duration = pulseIn(echo_pin, HIGH);
+  altitude_from_ultrasonic *= 0.034 / 2;
+}
+#endif
 void printAltitudeData()
 {
   if (current_time - print_counter > 10000)
