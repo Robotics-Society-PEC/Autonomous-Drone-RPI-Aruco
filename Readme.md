@@ -63,12 +63,12 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] Landing test
 - [ ] Searching algorithm in main code
 - [ ] Calibration of mag needs to be done
-- [ ] Fix Altitude Problems (Altitude shouldn't go negative)
+- [X] Fix Altitude Problems (Altitude shouldn't go negative)
 - [ ] Add low pass filter
 - [ ] Change arming sequence according to teensy 4.1
 - [ ] i2c communciation between rpi and teensy 4.1
 - [ ] Throttle build up way to slow (need to increase)
-- [ ] Need to reduce the percentage error on the throttle build up
+- [X] Need to reduce the percentage error on the throttle build up
 ## Our Teams Members
 
 - Mansi Kalra
