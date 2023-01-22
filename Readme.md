@@ -49,6 +49,8 @@ pip install --upgrade --force-reinstall <package_name>
 
 ## Important Points to note
 - The failsafe inside teensy is disabled
+- Do not plugin arduino nano to the USB without desoldering the wire
+
 
 ## Tasks
 
@@ -69,6 +71,11 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] i2c communciation between rpi and teensy 4.1
 - [ ] Throttle build up way to slow (need to increase)
 - [X] Need to reduce the percentage error on the throttle build up
+- [ ] Need to add limit switch
+- [ ] check roll, pitch pid with I as focus
+- [ ] rpi aruco fit
+- [ ] throttle cap increase
+- [ ] error calculation
 ## Our Teams Members
 
 - Mansi Kalra
@@ -86,3 +93,4 @@ pip install --upgrade --force-reinstall <package_name>
 - MPU6060 - 0x68
 - BMP280 - 0x77
 - Compass - 0x1E
+- Ultrasonic - 0x20

@@ -1198,7 +1198,7 @@ void controlANGLE()
     error_throttle_prev = error_throttle;
   }
 
-  throttle_PID = constrain(throttle_PID, 0.4, 0.8); // set max cap on throttle
+  throttle_PID = constrain(throttle_PID, 0.4,1.0); // set max cap on throttle
   // if (current_time - throttle_time_last_increased > 0) // now 2000 hz
   // {                                                    // 100 hz = 10000
   //   throttle_time_last_increased = micros();
