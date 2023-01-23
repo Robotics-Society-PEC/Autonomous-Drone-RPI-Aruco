@@ -76,6 +76,8 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] rpi aruco fit
 - [ ] throttle cap increase
 - [ ] error calculation
+- [ ] read madgwick when calibrating
+- [ ] implement running average on altitude and near the set point decrease Ki
 ## Our Teams Members
 
 - Mansi Kalra
