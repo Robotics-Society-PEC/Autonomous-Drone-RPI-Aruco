@@ -186,12 +186,16 @@ volatile int degree, secs, mins;
 double altitude_of_quad_from_ultrasonic;
 #endif
 double altitude_of_quad_after_algo = 0; // this is for storing altitude and can switch from multiple sensors
+double altitude_of_quad_after_algo_smoothed = 0; 
+#define length_of_running_average 500
+double running_average[length_of_running_average] = {0};
+byte location_in_running_average = 0;
 
 #ifdef compass
 float heading_degrees_from_compass = 0;
 unsigned long time_since_last_heading_from_compass;
 #endif
-double altitude_to_achieve = 0.5; // in metres
+double altitude_to_achieve = 0.8; // in metres
 unsigned long throttle_time_last_increased = 0;
 byte direction_of_error = 0;
 // Radio failsafe values for every channel in the event that bad reciever data is detected. Recommended defaults:
@@ -217,12 +221,12 @@ float MagScaleY = 1.0;
 float MagScaleZ = 1.0;
 
 // IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
-float AccErrorX = 0.09;
-float AccErrorY = 0.30;
-float AccErrorZ = 0.04;
-float GyroErrorX = 2.00;
-float GyroErrorY = 2.15;
-float GyroErrorZ = -5.77;
+float AccErrorX = 0.02;
+float AccErrorY = -0.02;
+float AccErrorZ = 0.09;
+float GyroErrorX = 2.63;
+float GyroErrorY = 2.36;
+float GyroErrorZ = -4.82;
 
 // Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;  // Integrator saturation level, mostly for safety (default 25.0)
@@ -230,9 +234,9 @@ float maxRoll = 50.0;  // Max roll angle in degrees for angle mode (maximum ~70 
 float maxPitch = 50.0; // Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
 float maxYaw = 160.0;  // Max yaw rate in deg/sec
 
-float Kp_throttle = 0.2;  // Throttle P-gain - angle mode
-float Ki_throttle = 0.35; // Throttle I-gain - angle mode
-float Kd_throttle = 0.15; // Throttle D-gain - angle mode (has no effect on controlANGLE2)
+float Kp_throttle = 20;  // Throttle P-gain - angle mode
+float Ki_throttle = 0.1; // Throttle I-gain - angle mode
+float Kd_throttle = 15; // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
 float Kp_roll_angle = 0.2;   // Roll P-gain - angle mode
 float Ki_roll_angle = 0.3;   // Roll I-gain - angle mode
@@ -345,7 +349,7 @@ float thro_des, roll_des, pitch_des, yaw_des;
 float roll_passthru, pitch_passthru, yaw_passthru;
 
 // Controller:
-#define STARTING_THROTTLE 0.55 / 0.01 / Ki_throttle
+#define STARTING_THROTTLE 0.3 / 0.01 / Ki_throttle
 float error_roll, error_roll_prev, roll_des_prev, integral_roll, integral_roll_il, integral_roll_ol, integral_roll_prev, integral_roll_prev_il, integral_roll_prev_ol, derivative_roll, roll_PID = 0;
 float error_pitch, error_pitch_prev, pitch_des_prev, integral_pitch, integral_pitch_il, integral_pitch_ol, integral_pitch_prev, integral_pitch_prev_il, integral_pitch_prev_ol, derivative_pitch, pitch_PID = 0;
 float error_yaw, error_yaw_prev, integral_yaw, integral_yaw_prev, derivative_yaw, yaw_PID = 0;
@@ -455,7 +459,7 @@ void setup()
   delay(5);
 
   // Get IMU error to zero accelerometer and gyro readings, assuming vehicle is level when powered up
-  // calculate_IMU_error(); // Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
+  calculate_IMU_error(); // Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
 
   // Arm servo channels
   servo1.write(0); // Command servo angle from 0-180 degrees (1000 to 2000 PWM)
@@ -509,16 +513,16 @@ void loop()
 
   // Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   // printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
-  // printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
+   //printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //  printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   // printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-  // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
+  //printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
   //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
-  printAltitudeData();
+   printAltitudeData();
 
 #ifdef sdcard
   log_data();
@@ -1141,7 +1145,7 @@ void controlANGLE()
   // Roll
   error_roll = roll_des - roll_IMU;
   integral_roll = integral_roll_prev + error_roll * dt;
-  if (channel_1_pwm < 1060)
+  if ((channel_1_pwm < 1060 && flight_mode == STABILIZE)) // no scope for this in altitude _ mode as min throttle is high
   { // Don't let integrator build if throttle is too low
     integral_roll = 0;
   }
@@ -1152,7 +1156,7 @@ void controlANGLE()
   // Pitch
   error_pitch = pitch_des - pitch_IMU;
   integral_pitch = integral_pitch_prev + error_pitch * dt;
-  if (channel_1_pwm < 1060)
+  if ((channel_1_pwm < 1060 && flight_mode == STABILIZE))
   { // Don't let integrator build if throttle is too low
     integral_pitch = 0;
   }
@@ -1163,7 +1167,7 @@ void controlANGLE()
   // Yaw, stablize on rate from GyroZ
   error_yaw = yaw_des - GyroZ;
   integral_yaw = integral_yaw_prev + error_yaw * dt;
-  if (channel_1_pwm < 1060)
+  if ((channel_1_pwm < 1060 && flight_mode == STABILIZE))
   { // Don't let integrator build if throttle is too low
     integral_yaw = 0;
   }
@@ -1172,6 +1176,15 @@ void controlANGLE()
   yaw_PID = .01 * (Kp_yaw * error_yaw + Ki_yaw * integral_yaw + Kd_yaw * derivative_yaw); // Scaled by .01 to bring within -1 to 1 range
 
   altitude_of_quad_after_algo = (altitude_of_quad_from_BMP > 2) ? altitude_of_quad_from_BMP : altitude_of_quad_from_ultrasonic;
+  running_average[location_in_running_average] = altitude_of_quad_after_algo;
+  location_in_running_average++;
+  if (location_in_running_average == length_of_running_average) location_in_running_average = 0;
+
+  altitude_of_quad_after_algo_smoothed = 0;
+  for(int i = 0 ; i < length_of_running_average ; i++)
+    altitude_of_quad_after_algo_smoothed += altitude_of_quad_after_algo / length_of_running_average;
+  
+
 
   if (flight_mode == ALTITUDE_HOLD_AUTO)
   {
@@ -1180,9 +1193,9 @@ void controlANGLE()
       integral_throttle_prev = STARTING_THROTTLE;
     }
 
-    error_throttle = altitude_to_achieve - altitude_of_quad_after_algo;
+    error_throttle = altitude_to_achieve - altitude_of_quad_after_algo_smoothed;
 
-    if (abs(altitude_of_quad_after_algo - altitude_to_achieve) > 0.1)
+    if (abs(altitude_of_quad_after_algo_smoothed - altitude_to_achieve) > 0.1)
     {
 
       integral_throttle = integral_throttle_prev + error_throttle * dt;
@@ -1194,11 +1207,11 @@ void controlANGLE()
       integral_throttle_prev = integral_throttle;
     }
 
-    altitude_throttle_prev = altitude_of_quad_after_algo;
+    altitude_throttle_prev = altitude_of_quad_after_algo_smoothed;
     error_throttle_prev = error_throttle;
   }
 
-  throttle_PID = constrain(throttle_PID, 0.4,1.0); // set max cap on throttle
+  throttle_PID = constrain(throttle_PID, 0.3,1.0); // set max cap on throttle
   // if (current_time - throttle_time_last_increased > 0) // now 2000 hz
   // {                                                    // 100 hz = 10000
   //   throttle_time_last_increased = micros();
@@ -1478,7 +1491,7 @@ void getCommands()
 #endif
 
   // Low-pass the critical commands and update previous values
-  float b = 0.7; // Lower=slower, higher=noiser
+  float b = 0.7; // Lower=slower, higher=noisier
   channel_1_pwm = (1.0 - b) * channel_1_pwm_prev + b * channel_1_pwm;
   channel_2_pwm = (1.0 - b) * channel_2_pwm_prev + b * channel_2_pwm;
   channel_3_pwm = (1.0 - b) * channel_3_pwm_prev + b * channel_3_pwm;
@@ -1538,10 +1551,9 @@ void failSafe()
 void commandMotors()
 {
   // DESCRIPTION: Send pulses to motor pins, oneshot125 protocol
-  /*
-   * My crude implimentation of OneShot125 protocol which sends 125 - 250us pulses to the ESCs (mXPin). The pulselengths being
-   * sent are mX_command_PWM, computed in scaleCommands(). This may be replaced by something more efficient in the future.
-   */
+  // My crude implementation of OneShot125 protocol which sends 125 - 250us pulses to the ESCs (mXPin). The pulse lengths being
+  // sent are mX_command_PWM, computed in scaleCommands(). This may be replaced by something more efficient in the future.
+
   int wentLow = 0;
   int pulseStart, timer;
   int flagM1 = 0;
@@ -1954,7 +1966,7 @@ void log_data()
     if (!file_opened && !error_occured)
     {
       file_opened = true;
-      logfile = SD.open("log_9_pid_algo_switch_testflight_2ultrasonic.txt", FILE_WRITE);
+      logfile = SD.open("log_soum_aayu_3.txt", FILE_WRITE);
       if (logfile)
       {
         error_occured = false;
@@ -1980,6 +1992,7 @@ void log_data()
         logfile.print("    Altitude from BMP280 : ,");
         logfile.print("    Altitude from ultrasonic : ,");
         logfile.print("    Altitude from selection algo : ,");
+        logfile.print("    Altitude from selection algo smotthed: ,");
         logfile.print("    Flight mode : ,");
         logfile.print("    ROLL IMU : ,");
         logfile.print("    PITCH IMU : ,");
@@ -2040,6 +2053,8 @@ void log_data()
       logfile.print(altitude_of_quad_from_ultrasonic);
       logfile.print(",  ");
       logfile.print(altitude_of_quad_after_algo);
+      logfile.print(",  ");
+      logfile.print(altitude_of_quad_after_algo_smoothed);
       logfile.print(",  ");
       logfile.print(flight_mode ? "Altitudehold" : "Stabalize");
       logfile.print(",  ");
@@ -2333,6 +2348,8 @@ void printAltitudeData()
 #endif
     Serial.print("Altitude from algo");
     Serial.println(altitude_of_quad_after_algo);
+    Serial.print("Altitude from algo smooth");
+    Serial.println(altitude_of_quad_after_algo_smoothed);
   }
 }
 

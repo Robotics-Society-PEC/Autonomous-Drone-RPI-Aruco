@@ -78,6 +78,7 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] error calculation
 - [ ] read madgwick when calibrating
 - [ ] implement running average on altitude and near the set point decrease Ki
+- [ ] for landing altitude needs to be changed softly
 ## Our Teams Members
 
 - Mansi Kalra
