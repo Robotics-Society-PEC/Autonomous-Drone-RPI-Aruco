@@ -9,6 +9,8 @@ import globalvariable
 # globalvariable.x_obj = None
 # globalvariable.y_obj = None
 
+
+
 def isRotationMatrix(R):
     Rt=np.transpose(R)
     shouldBeIdentity = np.dot(Rt,R)
@@ -59,11 +61,12 @@ def detectArucoandGetCoordinates():
     cap.set(2, camera_width)
     cap.set(4, camera_height)
     cap.set(5, camera_frame_rate)
+    result = cv2.VideoWriter('filename.avi', cv2.VideoWriter_fourcc(*'MPEG'),40, (int(cap.get(3)),int(cap.get(4))))
 
     while True:
         ret,frame = cap.read() #grab a frame
 
-        cv2.imshow('frame', frame)
+        #cv2.imshow('live_view', frame)
 
         key=cv2.waitKey(1) & 0xFF 
         
@@ -79,12 +82,15 @@ def detectArucoandGetCoordinates():
         if ids is None:
             globalvariable.x_obj = 640
             globalvariable.y_obj = 480
+            cv2.imshow('live_view', frame)
+            result.write(frame)
             continue
             
         for id in ids:
+            
             if id is not None:
                 aruco.drawDetectedMarkers(frame, corners)#draw a box around all the detected markers
-                #print (corners)
+                print(id)
                 arr=corners[0][0]
                 x1=arr[0][0]
                 x3=arr[2][0]
@@ -94,17 +100,18 @@ def detectArucoandGetCoordinates():
                 y_center=(y1+y3)/2
                 
                 # global globalvariable.x_obj,globalvariable.y_obj
+                #if (id[0]==2):
                 globalvariable.x_obj = x_center -320
                 globalvariable.y_obj = 240 - y_center
 
-                #print(globalvariable.x_obj,globalvariable.y_obj)
+                print(globalvariable.x_obj,globalvariable.y_obj)
             #get pose of all single markers
                 rvec_list_all, tvec_list_all , _objPoints = aruco.estimatePoseSingleMarkers(corners, marker_size , camera_matrix, camera_distortion)
                 rvec = rvec_list_all[0][0]
                 tvec = tvec_list_all[0][0]
-
+                #print(camera_matrix , camera_distortion)
                 aruco.drawAxis(frame, camera_matrix, camera_distortion , rvec, tvec, 100)
-                
+                #print (corners)
                 rvec_flipped = rvec* -1
                 tvec_flipped = tvec* -1
                 rotation_matrix, jacobian =cv2.Rodrigues(rvec_flipped)
@@ -114,10 +121,12 @@ def detectArucoandGetCoordinates():
 
                 tvec_str = " x=%4.0f y=%4.0f direction=%4.0f"%(realworld_tvec[0], realworld_tvec[1], math.degrees(yaw))
                 cv2.putText(frame, tvec_str ,(20,460), cv2.FONT_HERSHEY_PLAIN ,2 ,(0,0,255) ,2 , cv2.LINE_AA)
-
+        cv2.imshow('live_view', frame)
+        result.write(frame)
         
 
     cap.release()
+    result.release()
     cv2.destroyAllWindows()
 
 if __name__ == "__main__":
