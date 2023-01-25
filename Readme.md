@@ -51,7 +51,6 @@ pip install --upgrade --force-reinstall <package_name>
 - The failsafe inside teensy is disabled
 - Do not plugin arduino nano to the USB without desoldering the wire
 
-
 ## Tasks
 
 - [X] get altitude from Raspberry pi to teensy(i2c)(needs to be used)
@@ -77,7 +76,9 @@ pip install --upgrade --force-reinstall <package_name>
 - [X] implement running average on altitude and near the set point decrease Ki
 - [ ] for landing altitude needs to be changed softly
 - [ ] test calibrateAttitude function
-- [ ] fix bluetooth
+- [ ] fix bluetooth // instead of this use #define
+- [ ] implement madgwick fir
+- [ ]  speed of i2c bus of raspberry pi may need to be changed
 
 ## Our Teams Members
 

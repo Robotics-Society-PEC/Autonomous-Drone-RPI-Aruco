@@ -410,15 +410,19 @@ void setup()
 
 #ifdef BLUETOOTH_EN
   Serial8.begin(9600); // USB serial
-#endif
-
+#else
   Serial.begin(50000);
+#endif
   delay(1000);
 
 #ifdef sdcard
   if (!SD.begin(BUILTIN_SDCARD))
   {
+#ifdef BLUETOOTH_EN
+    Serial8.println("initialization of SDCARD failed!");
+#else
     Serial.println("initialization of SDCARD failed!");
+#endif
     DisplayErrorCode(1);
     while (1)
       ;
@@ -432,8 +436,13 @@ void setup()
   status = bmp.begin(0x77);
   if (!status)
   {
+#ifdef BLUETOOTH_EN
+    Serial8.println(F("Could not find a valid BMP280 sensor, check wiring or "
+                      "try a different address!"));
+#else
     Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
                      "try a different address!"));
+#endif
     DisplayErrorCode(2);
   }
   bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,   /* Operating Mode. */
@@ -447,14 +456,22 @@ void setup()
 #ifdef compass
   if (!mag.begin())
   {
-    /* There was a problem detecting the HMC5883 ... check your connections */
+/* There was a problem detecting the HMC5883 ... check your connections */
+#ifdef BLUETOOTH_EN
+    Serial8.println("Ooops, no HMC5883 detected ... Check your wiring!");
+#else
     Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
+#endif
     DisplayErrorCode(3);
   }
 #endif
 #ifdef m8nGPS
   Serial5.begin(9600); /* Define baud rate for software serial communication */
+#ifdef BLUETOOTH_EN
+  Serial8.println("Initializing GPS");
+#else
   Serial.println("Initializing GPS");
+#endif
 #endif
 
   // Set built in LED to turn on to signal startup
@@ -663,10 +680,10 @@ void IMUinit()
 #ifdef BLUETOOTH_EN
     Serial8.println("MPU6050 initialization unsuccessful");
     Serial8.println("Check MPU6050 wiring or try cycling power");
-#endif
+#else
     Serial.println("MPU6050 initialization unsuccessful");
     Serial.println("Check MPU6050 wiring or try cycling power");
-
+#endif
     DisplayErrorCode(4);
   }
 
@@ -686,11 +703,12 @@ void IMUinit()
     Serial8.println("Check MPU9250 wiring or try cycling power");
     Serial8.print("Status: ");
     Serial8.println(status);
-#endif
+#else
     Serial.println("MPU9250 initialization unsuccessful");
     Serial.println("Check MPU9250 wiring or try cycling power");
     Serial.print("Status: ");
     Serial.println(status);
+#endif
     DisplayErrorCode(4);
   }
 
@@ -856,7 +874,7 @@ void calculate_IMU_error()
   Serial8.println(";");
 
   Serial8.println("Paste these values in user specified variables section and comment out calculate_IMU_error() in void setup.");
-#endif
+#else
   Serial.print("float AccErrorX = ");
   Serial.print(AccErrorX);
   Serial.println(";");
@@ -878,6 +896,7 @@ void calculate_IMU_error()
   Serial.println(";");
 
   Serial.println("Paste these values in user specified variables section and comment out calculate_IMU_error() in void setup.");
+#endif
 }
 
 void calibrateAttitude()
@@ -1841,7 +1860,7 @@ void calibrateMagnetometer()
   delay(1000);
   Serial8.println("Rotate the IMU about all axes until complete.");
   Serial8.println(" ");
-#endif
+#else
   Serial.println("Beginning magnetometer calibration in");
   Serial.println("3...");
   delay(1000);
@@ -1851,6 +1870,7 @@ void calibrateMagnetometer()
   delay(1000);
   Serial.println("Rotate the IMU about all axes until complete.");
   Serial.println(" ");
+#endif
   success = mpu9250.calibrateMag();
   if (success)
   {
@@ -1877,7 +1897,7 @@ void calibrateMagnetometer()
     Serial8.println(";");
     Serial8.println(" ");
     Serial8.println("If you are having trouble with your attitude estimate at a new flying location, repeat this process as needed.");
-#endif
+#else
     Serial.println("Calibration Successful!");
     Serial.println("Please comment out the calibrateMagnetometer() function and copy these values into the code:");
     Serial.print("float MagErrorX = ");
@@ -1900,27 +1920,34 @@ void calibrateMagnetometer()
     Serial.println(";");
     Serial.println(" ");
     Serial.println("If you are having trouble with your attitude estimate at a new flying location, repeat this process as needed.");
+#endif
   }
   else
   {
 #ifdef BLUETOOTH_EN
     Serial8.println("Calibration Unsuccessful. Please reset the board and try again.");
-#endif
+#else
     Serial.println("Calibration Unsuccessful. Please reset the board and try again.");
+#endif
   }
 
   while (1)
     ; // Halt code so it won't enter main loop until this function commented out
 #elif defined compass
-  // DOOOOO SOMETHINGGGGGGGGG]
+// DOOOOO SOMETHINGGGGGGGGG]
+#ifdef BLUETOOTH_EN
+  Serial8.println("magnometer callibration not implemented");
+#else
   Serial.println("magnometer callibration not implemented");
+#endif
   DisplayErrorCode(7);
 #endif
 
 #ifdef BLUETOOTH_EN
   Serial8.println("Error: MPU9250 not selected. Cannot calibrate non-existent magnetometer.");
-#endif
+#else
   Serial.println("Error: MPU9250 not selected. Cannot calibrate non-existent magnetometer.");
+#endif
   DisplayErrorCode(5);
 }
 
@@ -1990,7 +2017,11 @@ void log_data()
     if (file_opened)
     {
       file_opened = false;
+#ifdef BLUETOOTH_EN
+      Serial8.print("Closed logfile");
+#else
       Serial.print("Closed logfile");
+#endif
       logfile.close();
     }
   }
@@ -2004,7 +2035,11 @@ void log_data()
       if (logfile)
       {
         error_occured = false;
+#ifdef BLUETOOTH_EN
+        Serial8.print("Opened logfile");
+#else
         Serial.print("Opened logfile");
+#endif
         logfile.print(F("TIME: ,"));
         logfile.print(F("CH1: ,"));
         logfile.print(F("    CH2: ,"));
@@ -2036,7 +2071,11 @@ void log_data()
       else
       { // if the file didn't open, print an error:
         error_occured = true;
+#ifdef BLUETOOTH_EN
+        Serial8.println("error opening logfile");
+#else
         Serial.println("error opening logfile");
+#endif
       }
     }
 
@@ -2123,7 +2162,7 @@ void printRadioData()
     Serial8.print(channel_5_pwm);
     Serial8.print(F(" CH6: "));
     Serial8.println(channel_6_pwm);
-#endif
+#else
     Serial.print(F(" CH1: "));
     Serial.print(channel_1_pwm);
     Serial.print(F(" CH2: "));
@@ -2136,6 +2175,7 @@ void printRadioData()
     Serial.print(channel_5_pwm);
     Serial.print(F(" CH6: "));
     Serial.println(channel_6_pwm);
+#endif
   }
 }
 
@@ -2153,7 +2193,7 @@ void printDesiredState()
     Serial8.print(pitch_des);
     Serial8.print(F(" yaw_des: "));
     Serial8.println(yaw_des);
-#endif
+#else
     Serial.print(F("thro_des: "));
     Serial.print(thro_des);
     Serial.print(F(" roll_des: "));
@@ -2162,6 +2202,7 @@ void printDesiredState()
     Serial.print(pitch_des);
     Serial.print(F(" yaw_des: "));
     Serial.println(yaw_des);
+#endif
   }
 }
 
@@ -2177,13 +2218,14 @@ void printGyroData()
     Serial8.print(GyroY);
     Serial8.print(F(" GyroZ: "));
     Serial8.println(GyroZ);
-#endif
+#else
     Serial.print(F("GyroX: "));
     Serial.print(GyroX);
     Serial.print(F(" GyroY: "));
     Serial.print(GyroY);
     Serial.print(F(" GyroZ: "));
     Serial.println(GyroZ);
+#endif
   }
 }
 
@@ -2202,9 +2244,13 @@ void get_altitude_from_barometer()
 }
 void calibrateForAltitude()
 {
-  // enter calibration code
-  // do slowly at 10 hz
+// enter calibration code
+// do slowly at 10 hz
+#ifdef BLUETOOTH_EN
+  Serial8.println("Calibration Starting");
+#else
   Serial.println("Calibration Starting");
+#endif
   int i = 0;
   normalize_pressure = 0;
   float temp = 0;
@@ -2212,14 +2258,24 @@ void calibrateForAltitude()
   {
     temp = bmp.readPressure() / 100.0 / 5.0;
     normalize_pressure += temp; // do this 25 times in loop
+#ifdef BLUETOOTH_EN
+    Serial8.println(temp);
+#else
     Serial.println(temp);
+#endif
+
+#endif
     i++;
     delay(500);
   }
   normalize_pressure = normalize_pressure / 10.0; // for 100th pascal callibration
 
-  // get altitude from sensor
-  Serial.println("Calibration Done");
+// get altitude from sensor
+#ifdef BLUETOOTH_EN
+  Serial8.println("Calibration Done");
+#else
+Serial.println("Calibration Done");
+#endif
 }
 #endif
 #ifdef compass
@@ -2367,9 +2423,7 @@ void printAltitudeData()
   {
 
     print_counter = micros();
-#ifdef BLUETOOTH_EN
-    Serial8.println(altitude_of_quad_from_BMP);
-#endif
+
 #ifdef BMP280
     Serial.print("Altitude from BMP280 is ");
     Serial.println(altitude_of_quad_from_BMP);
@@ -2431,9 +2485,10 @@ void getFlightMode()
 {
 #ifdef ALTITUDE_HOLD_AUTO
   if (channel_6_pwm > 1500)
-  
+  {
+
     flight_mode = ALTITUDE_HOLD_AUTO;
-    digitalWrite(mux_pin, HIGH);
+    // digitalWrite(mux_pin, HIGH);
   }
   else
   {

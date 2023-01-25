@@ -8,12 +8,15 @@ import threading
 import aruco_detection2
 # from globalvariable import globalvariable.x_obj , globalvariable.y_obj
 import globalvariable
+from smbus import SMBus
 #from i2c_get_dist import *
+
+bus = SMBus(1)
+
 
 
 
 # set range of all sticks
-MAX_THROTTLE = 0.8
 MIN_YAW = 0.3
 MAX_YAW = 0.7
 MIN_ROLL = 0.45
@@ -22,7 +25,6 @@ MIN_PITCH = 0.45
 MAX_PITCH = 0.55
 
 # channel mapping 
-THROTTLE_CH = 2
 PITCH_CH = 1
 ROLL_CH = 0
 YAW_CH = 3
@@ -33,7 +35,6 @@ AUX_3_CH = 6
 
 #Pramaters related to PID loop and Aruco
 MAX_MAGNITUDE = 10000 # absolute value
-MAX_MAGNITUDE_THROTTLE = 500
 OBJECT_IN_RADIUS_IN_PIXEL = 25 # IN PIXELS  
 
 KP_ROLL = 15
@@ -44,44 +45,34 @@ KP_PITCH = 15
 KI_PITCH = 1
 KD_PITCH = 3
 
-KP_THROTTLE = 1
-KI_THROTTLE = 10
-KD_THROTTLE = 10
 
 
-# paramters related to throttle control
-DESCENT_RATE = 0.01 
-ASCENT_RATE = 0.02 # TO BE SET 
-PERCENTAGE_TOLERANCE = 0.1 # BETWEEN 0 AND 1
-FREQ_IN_SEC_OF_THROTTLE_REFRESH = 0.01 # upto 157 hz allowed # abhi 100 hz
+
 FREQ_IN_SEC_OF_PWM_GEN = 0.05 
-target_height=4
+
 
 
 # starting  values for all axis
-throttle_value = 0
+
 yaw_value = 0.5
 roll_value = 0.5
 pitch_value = 0.5
 
 is_armed = False
-direction_of_error = "down"
-previoud_direction_of_error = "down"
 
 
 
 
-#assertions
-assert MAX_THROTTLE <= 1
-assert DESCENT_RATE <= 0.5 
-assert ASCENT_RATE <= 0.3
+
+
 
 # can adjust yaw axis on basis of an edge of the aruco code or the box detected 
 # the above would help maybe i dont know 
+# may have to implement running average
 
 e_prev_pitch = list(itertools.repeat(0,1000))
 e_prev_roll = list(itertools.repeat(0,1000))
-e_prev_throttle = list(itertools.repeat(0,1000))
+
 
 
 def pid_roll(Distance=0):
@@ -102,25 +93,7 @@ def pid_roll(Distance=0):
     else:    
         return(Distance_new)
 
-def pid_throtle(Height=0):
-    # PID has a limiter in it
-    if abs(Height) < 0.3:
-        return throttle_value*MAX_MAGNITUDE_THROTTLE
-    e = Height
-    e_prev_throttle.insert(0,e)
-    del e_prev_throttle[len(e_prev_throttle)-1]
-    P = KP_THROTTLE*e
-    I = KI_THROTTLE*sum(e_prev_throttle)*FREQ_IN_SEC_OF_THROTTLE_REFRESH # summ of elements of e
-    D = KD_THROTTLE*(e_prev_throttle[0]-e_prev_throttle[1])/FREQ_IN_SEC_OF_THROTTLE_REFRESH # previous error - current error
 
-    Distance_new =  P + I + D
-    # print(Distance_new)
-    if Distance_new > MAX_MAGNITUDE_THROTTLE:
-        return MAX_MAGNITUDE_THROTTLE
-    elif Distance_new < 0:
-        return 0
-    else:
-        return Distance_new
       
 
 def pid_pitch(Distance=0):
@@ -184,23 +157,17 @@ def pid_pitch(Distance=0):
     
 
 def arm():
-    global throttle_value,yaw_value,roll_value,pitch_value
-    s1= 0 #input from switch on the quad
-    time.sleep(10)
-    pwm_generator.servo[PITCH_CH].set_pulse_width_range(1100, 2080)
-    pwm_generator.servo[ROLL_CH].set_pulse_width_range(1000, 2010)
-    pwm_generator.servo[YAW_CH].set_pulse_width_range(1100, 2080)
-    throttle_value = 0
-    yaw_value = 1
-    roll_value = 0
-    pitch_value = 1
-    time.sleep(5)
+    # check with teensy whether it has armed or not at 100 hz or even less as not so much bt / time wastage
+    global yaw_value,roll_value,pitch_value
+    # check from wire if the drone has armed
     global is_armed
-    is_armed = True
+    is_armed = False
+    while not is_armed:
+        # chec on i2c 
+        time.sleep(0.1)
     pwm_generator.servo[PITCH_CH].set_pulse_width_range(1100, 2010)
     pwm_generator.servo[ROLL_CH].set_pulse_width_range(1100, 2010)
     pwm_generator.servo[YAW_CH].set_pulse_width_range(1100, 2010)
-    throttle_value = 0
     yaw_value = 0.5
     roll_value = 0.5
     pitch_value = 0.5
@@ -214,67 +181,11 @@ def pick_magnet():
 
 
 
-# def Hover():
-#     print("now in hover")
-#     global target_height
-#     dist=0
-#     global throttle_value, DESCENT_RATE 
-#     while True: #put condition for landing zone aruco detected
-#         dist= give_dist()#take input from sonar
-#         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
-#             throttle_value=0.46
-#             direction_of_error = "up"
-#         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
-#             throttle_value=0.6
-#             direction_of_error = "down" 
-#         else:
-#             throttle_value = 0.5
-#             direction_of_error = "center"
-            
-            
-
-#         if throttle_value>MAX_THROTTLE:
-#             throttle_value=MAX_THROTTLE
-#         elif throttle_value<0:
-#             throttle_value=0
-#         #print (f'throttle = {throttle_value}')
-#         time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
-
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
-
-# def Hover():
-#     print("now in hover")
-#     global target_height
-#     temp=0
-#     dist=0
-#     global throttle_value, DESCENT_RATE 
-#     temp = give_dist()
-#     while True: #put condition for landing zone aruco detected
-        
-#         dist= give_dist()#take input from sonar
-#         if dist > (1 + PERCENTAGE_TOLERANCE)*target_height: #take dist input from sonar
-#             if dist>=temp :
-#                 throttle_value=throttle_value-DESCENT_RATE 
-#                 temp=dist
-        
-#         elif dist < (1 - PERCENTAGE_TOLERANCE)*target_height:
-#             if dist<=temp :
-#                 throttle_value=throttle_value+ASCENT_RATE  
-#                 temp=dist
-            
-            
-#         if throttle_value>MAX_THROTTLE:
-#             throttle_value=MAX_THROTTLE
-#         elif throttle_value<0:
-#             throttle_value=0
-#         #print (f'throttle = {throttle_value}')
-#         time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
-    
 
 
 
 def movedrone(x,y):
-    global roll_value, pitch_value ,throttle_value
+    global roll_value, pitch_value 
     if not is_armed:
         transmit()
         return
@@ -299,8 +210,7 @@ def movedrone(x,y):
         # make drone stable using GPS how GPS
         #throttle_value = something 
         print("Object under drone")
-        global target_height
-        target_height=1
+        # land 
         transmit()
         
     
@@ -320,14 +230,13 @@ def transmit():
     #pwm_generator.servo[0].angle = 180
     # function used to set the acttuation range of servo
     #pwm_generator.servo[0].actuation_range = 160
-    global yaw_value , roll_value , pitch_value , throttle_value
+    global yaw_value , roll_value , pitch_value 
     roll_value_angle = 180*roll_value
     pitch_value_angle = 180*pitch_value
     throttle_value_angle = 180*throttle_value
     yaw_value_angle = 180* yaw_value
 
-    print(f't{throttle_value} y{yaw_value} r{roll_value} p{pitch_value}')
-    # pwm_generator.servo[THROTTLE_CH].angle = throttle_value_angle
+    print(f' y{yaw_value} r{roll_value} p{pitch_value}')
     pwm_generator.servo[PITCH_CH].angle = pitch_value_angle
     pwm_generator.servo[ROLL_CH].angle = roll_value_angle
     pwm_generator.servo[YAW_CH].angle = yaw_value_angle
@@ -373,7 +282,6 @@ try:
         # Create an object named pwm_generator with 16 channel
         pwm_generator = ServoKit(channels=16)
         # function to set the PWM duty cycle range, leave at default value
-        pwm_generator.servo[THROTTLE_CH].set_pulse_width_range(1050, 2010)
         pwm_generator.servo[PITCH_CH].set_pulse_width_range(1100, 2010)
         pwm_generator.servo[ROLL_CH].set_pulse_width_range(1100, 2010)
         pwm_generator.servo[YAW_CH].set_pulse_width_range(1100, 2010)
@@ -381,7 +289,7 @@ try:
         pwm_generator.servo[AUX_2_CH].set_pulse_width_range(0, 20000)
         pwm_generator.servo[AUX_3_CH].set_pulse_width_range(0, 20000)
         
-        pwm_generator.servo[THROTTLE_CH].actuation_range = 180
+
         pwm_generator.servo[PITCH_CH].actuation_range = 180
         pwm_generator.servo[ROLL_CH].actuation_range = 180
         pwm_generator.servo[YAW_CH].actuation_range = 180
@@ -391,8 +299,6 @@ try:
 
         # threads
         pwm_generate_and_pid_and_movedrone_thread = threading.Thread(target=pwm_generate)
-        # throttle_thread = threading.Thread(target = Hover)
-
         
         
         pwm_generate_and_pid_and_movedrone_thread.start()
@@ -400,13 +306,15 @@ try:
         while GPIO.input(23) == GPIO.HIGH:
 
             print(f"PRESS BUTTON , base line = {globalvariable.baseline}")
+            # check the arm status
             # print(give_dist())
             # time.sleep(1)
+            #arm()?? 
+            # if disarms any time then stop threads
             pass
         
-        arm()
+        
     
-        #throttle_thread.start()
         
         
         aruco_detection2.detectArucoandGetCoordinates()
@@ -414,5 +322,5 @@ try:
         GPIO.cleanup()
 
 except KeyboardInterrupt:
-    pwm_generator.servo[THROTTLE_CH].angle = 0
+    bus.close()
     GPIO.cleanup()
