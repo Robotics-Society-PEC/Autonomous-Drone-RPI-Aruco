@@ -86,3 +86,4 @@ pip install --upgrade --force-reinstall <package_name>
 - MPU6050 - 0x68
 - BMP280 - 0x77
 - Compass - 0x1E
+- Arduino - 0x32
