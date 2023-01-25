@@ -93,7 +93,7 @@ pip install --upgrade --force-reinstall <package_name>
 ## Addresses of diffrent devices
 
 - Teensy 0x44
-- MPU6060 - 0x68
+- MPU6050 - 0x68
 - BMP280 - 0x77
 - Compass - 0x1E
 - Ultrasonic - 0x20

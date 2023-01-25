@@ -2431,9 +2431,9 @@ void getFlightMode()
 {
 #ifdef ALTITUDE_HOLD_AUTO
   if (channel_6_pwm > 1500)
-  {
+  
     flight_mode = ALTITUDE_HOLD_AUTO;
-    // digitalWrite(mux_pin, HIGH);
+    digitalWrite(mux_pin, HIGH);
   }
   else
   {

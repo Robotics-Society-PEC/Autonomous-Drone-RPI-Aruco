@@ -8,7 +8,7 @@ import threading
 import aruco_detection2
 # from globalvariable import globalvariable.x_obj , globalvariable.y_obj
 import globalvariable
-from i2c_get_dist import *
+#from i2c_get_dist import *
 
 
 
@@ -18,8 +18,8 @@ MIN_YAW = 0.3
 MAX_YAW = 0.7
 MIN_ROLL = 0.45
 MAX_ROLL = 0.55
-MIN_PITCH = 0.55
-MAX_PITCH = 0.45
+MIN_PITCH = 0.45
+MAX_PITCH = 0.55
 
 # channel mapping 
 THROTTLE_CH = 2
@@ -240,21 +240,7 @@ def pick_magnet():
 #         #print (f'throttle = {throttle_value}')
 #         time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
 
-def Hover():
-    print("now in hover")
-    global target_height , throttle_value, DESCENT_RATE
-    height =0
-    while True: #put condition for landing zone aruco detected
-        height = give_dist()#take input from sonar
-        
-        throttle_value = pid_throtle(target_height - height) / MAX_MAGNITUDE_THROTTLE
-
-        if throttle_value>MAX_THROTTLE:
-            throttle_value=MAX_THROTTLE
-        elif throttle_value<0:
-            throttle_value=0
-        #print (f'throttle = {throttle_value}')
-        time.sleep(FREQ_IN_SEC_OF_THROTTLE_REFRESH)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
 
 # def Hover():
 #     print("now in hover")
@@ -341,7 +327,7 @@ def transmit():
     yaw_value_angle = 180* yaw_value
 
     print(f't{throttle_value} y{yaw_value} r{roll_value} p{pitch_value}')
-    pwm_generator.servo[THROTTLE_CH].angle = throttle_value_angle
+    # pwm_generator.servo[THROTTLE_CH].angle = throttle_value_angle
     pwm_generator.servo[PITCH_CH].angle = pitch_value_angle
     pwm_generator.servo[ROLL_CH].angle = roll_value_angle
     pwm_generator.servo[YAW_CH].angle = yaw_value_angle
@@ -394,6 +380,7 @@ try:
         pwm_generator.servo[AUX_1_CH].set_pulse_width_range(0, 20000)
         pwm_generator.servo[AUX_2_CH].set_pulse_width_range(0, 20000)
         pwm_generator.servo[AUX_3_CH].set_pulse_width_range(0, 20000)
+        
         pwm_generator.servo[THROTTLE_CH].actuation_range = 180
         pwm_generator.servo[PITCH_CH].actuation_range = 180
         pwm_generator.servo[ROLL_CH].actuation_range = 180
@@ -404,7 +391,7 @@ try:
 
         # threads
         pwm_generate_and_pid_and_movedrone_thread = threading.Thread(target=pwm_generate)
-        throttle_thread = threading.Thread(target = Hover)
+        # throttle_thread = threading.Thread(target = Hover)
 
         
         
@@ -419,7 +406,7 @@ try:
         
         arm()
     
-        throttle_thread.start()
+        #throttle_thread.start()
         
         
         aruco_detection2.detectArucoandGetCoordinates()
