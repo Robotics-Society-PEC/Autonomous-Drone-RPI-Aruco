@@ -69,16 +69,16 @@ pip install --upgrade --force-reinstall <package_name>
 - [ ] Add low pass filter
 - [ ] Change arming sequence according to teensy 4.1
 - [ ] i2c communciation between rpi and teensy 4.1
-- [ ] Throttle build up way to slow (need to increase)
 - [X] Need to reduce the percentage error on the throttle build up
-- [ ] Need to add limit switch
-- [ ] check roll, pitch pid with I as focus
 - [ ] rpi aruco fit
 - [ ] throttle cap increase
 - [ ] error calculation
 - [ ] read madgwick when calibrating
-- [ ] implement running average on altitude and near the set point decrease Ki
+- [X] implement running average on altitude and near the set point decrease Ki
 - [ ] for landing altitude needs to be changed softly
+- [ ] test calibrateAttitude function
+- [ ] fix bluetooth
+
 ## Our Teams Members
 
 - Mansi Kalra
@@ -97,3 +97,12 @@ pip install --upgrade --force-reinstall <package_name>
 - BMP280 - 0x77
 - Compass - 0x1E
 - Ultrasonic - 0x20
+
+## Errors
+
+- 1 blink per second == SD card error
+- 2 blink per second == BMP error
+- 3 blink per second == Compass error
+- 4 blink per second == MPU error
+- 5 blink per second == magnometer calibration error
+- 7 blink per second == Code yet to be implemented

@@ -27,18 +27,21 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 //========================================================================================================================//
 //                                                 USER-SPECIFIED DEFINES                                                 //
 //========================================================================================================================//
+
 #define ASCENT_RATE 0.0005
 #define DESCENT_RATE 0.0001
 #define PERCENTAGE_TOLERANCE 0.2
 
+// user defined sensors/ modes available
 // #define BLUETOOTH_EN
 // #define m8nGPS
 #define HCSR04
 // #define compass
-#define sdcard
+// #define sdcard
 #define BMP280
-#define mux_pin 32
+
 // Uncomment only one receiver type
+#define mux_pin 32
 #define USE_PWM_RX
 // #define USE_PPM_RX
 // #define USE_SBUS_RX
@@ -63,11 +66,13 @@ static const uint8_t num_DSM_channels = 6; // If using DSM RX, change this to ma
 
 // modes
 #define STABILIZE 0
-#define ALTITUDE_HOLD_AUTO 1
+byte flight_mode = STABILIZE;
+bool is_armed = false;
+// rest modes can be defined on the basis of differnt sensors available
 
 //========================================================================================================================//
 
-// REQUIRED LIBRARIES (included with download in main sketch folder)
+// REQUIRED LIBRARIES (included with download in main sketch folder) and Objects and Safety Checks if any
 
 #include <Wire.h>     //I2c communication
 #include <SPI.h>      //SPI communication
@@ -78,15 +83,18 @@ static const uint8_t num_DSM_channels = 6; // If using DSM RX, change this to ma
 #include <SD.h>
 File logfile;
 #endif
+
 #ifdef BMP280
 #include <Adafruit_BMP280.h>
 Adafruit_BMP280 bmp;
 #endif
+
 #ifdef compass
 #include <Adafruit_Sensor.h>
 #include <Adafruit_HMC5883_U.h>
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 #endif
+
 #ifdef m8nGPS
 #include <TinyGPS++.h>
 TinyGPSPlus gps;
@@ -110,8 +118,11 @@ MPU9250 mpu9250(SPI2, 36);
 #error No MPU defined...
 #endif
 
-//========================================================================================================================//
+#if defined HCSR04 && !defined BMP280
+#error This is not recommended as if the drone overshoots then you may loose control
+#endif
 
+//========================================================================================================================//
 // Setup gyro and accel full scale value selection and scale factor
 
 #if defined USE_MPU6050_I2C
@@ -166,11 +177,12 @@ MPU9250 mpu9250(SPI2, 36);
 //                                               USER-SPECIFIED VARIABLES                                                 //
 //========================================================================================================================//
 
+// Variables related to diffrent sensors/modules available
 #ifdef sdcard
 bool file_opened = false;
 bool error_occured = false;
 #endif
-//
+
 #ifdef m8nGPS
 unsigned long start;
 double lat_val = 0, lng_val = 0, altitude_of_quad_from_GPS = 0;
@@ -185,19 +197,43 @@ volatile int degree, secs, mins;
 #ifdef HCSR04
 double altitude_of_quad_from_ultrasonic;
 #endif
+
+#ifdef BMP280
+double altitude_of_quad_from_BMP = 0;
+// double altitude_throttle_prev = 0;
+double normalize_pressure = 978.2;
+#endif
+
+#if defined HCSR04 || defined BMP280
+#define ALTITUDE_HOLD_AUTO 1
+#endif
+
+// params related to altitude hold mode
+
+float Kp_throttle = 20;  // Throttle P-gain - altitude hold angle mode
+float Ki_throttle = 0.1; // Throttle I-gain - angle mode
+float Kd_throttle = 15;  // Throttle D-gain - angle mode (has no effect on controlANGLE2)
+
+#ifdef ALTITUDE_HOLD_AUTO
+unsigned long time_since_last_alt_from_BMP;
 double altitude_of_quad_after_algo = 0; // this is for storing altitude and can switch from multiple sensors
-double altitude_of_quad_after_algo_smoothed = 0; 
+double altitude_of_quad_after_algo_smoothed = 0;
 #define length_of_running_average 500
+#define switching_altitude 2
 double running_average[length_of_running_average] = {0};
 byte location_in_running_average = 0;
+double altitude_to_achieve = 0.8; // in metres
+#define STARTING_THROTTLE 0.3 / 0.01 / Ki_throttle
+float error_throttle, error_throttle_prev, integral_throttle, integral_throttle_prev = STARTING_THROTTLE, derivative_throttle, throttle_PID = 0;
+#endif
 
 #ifdef compass
 float heading_degrees_from_compass = 0;
 unsigned long time_since_last_heading_from_compass;
 #endif
-double altitude_to_achieve = 0.8; // in metres
-unsigned long throttle_time_last_increased = 0;
-byte direction_of_error = 0;
+
+// unsigned long throttle_time_last_increased = 0;
+
 // Radio failsafe values for every channel in the event that bad reciever data is detected. Recommended defaults:
 unsigned long channel_1_fs = 1000; // thro
 unsigned long channel_2_fs = 1500; // ail
@@ -221,22 +257,18 @@ float MagScaleY = 1.0;
 float MagScaleZ = 1.0;
 
 // IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
-float AccErrorX = 0.02;
-float AccErrorY = -0.02;
+float AccErrorX = 0.03;
+float AccErrorY = -0.01;
 float AccErrorZ = 0.09;
-float GyroErrorX = 2.63;
-float GyroErrorY = 2.36;
-float GyroErrorZ = -4.82;
+float GyroErrorX = 2.69;
+float GyroErrorY = 2.34;
+float GyroErrorZ = -4.76;
 
 // Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;  // Integrator saturation level, mostly for safety (default 25.0)
 float maxRoll = 50.0;  // Max roll angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
 float maxPitch = 50.0; // Max pitch angle in degrees for angle mode (maximum ~70 degrees), deg/sec for rate mode
 float maxYaw = 160.0;  // Max yaw rate in deg/sec
-
-float Kp_throttle = 20;  // Throttle P-gain - angle mode
-float Ki_throttle = 0.1; // Throttle I-gain - angle mode
-float Kd_throttle = 15; // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
 float Kp_roll_angle = 0.2;   // Roll P-gain - angle mode
 float Ki_roll_angle = 0.3;   // Roll I-gain - angle mode
@@ -299,22 +331,15 @@ PWMServo servo7;
 
 // DECLARE GLOBAL VARIABLES
 
-// General stuff
-double altitude_of_quad_from_BMP = 0;
-double altitude_throttle_prev = 0;
-byte flight_mode = STABILIZE;
-bool is_armed = false;
-
-double normalize_pressure = 978.2;
-
 float dt;
 unsigned long current_time, prev_time;
-unsigned long print_counter, serial_counter, time_since_last_altitude;
+unsigned long print_counter, serial_counter;
+unsigned long blink_counter, blink_delay;
+bool blinkAlternate;
+
 #ifdef sdcard
 unsigned long last_log_time;
 #endif
-unsigned long blink_counter, blink_delay;
-bool blinkAlternate;
 
 // Radio communication:
 unsigned long channel_1_pwm, channel_2_pwm, channel_3_pwm, channel_4_pwm, channel_5_pwm, channel_6_pwm;
@@ -349,11 +374,9 @@ float thro_des, roll_des, pitch_des, yaw_des;
 float roll_passthru, pitch_passthru, yaw_passthru;
 
 // Controller:
-#define STARTING_THROTTLE 0.3 / 0.01 / Ki_throttle
 float error_roll, error_roll_prev, roll_des_prev, integral_roll, integral_roll_il, integral_roll_ol, integral_roll_prev, integral_roll_prev_il, integral_roll_prev_ol, derivative_roll, roll_PID = 0;
 float error_pitch, error_pitch_prev, pitch_des_prev, integral_pitch, integral_pitch_il, integral_pitch_ol, integral_pitch_prev, integral_pitch_prev_il, integral_pitch_prev_ol, derivative_pitch, pitch_PID = 0;
 float error_yaw, error_yaw_prev, integral_yaw, integral_yaw_prev, derivative_yaw, yaw_PID = 0;
-float error_throttle, error_throttle_prev, integral_throttle, integral_throttle_prev = STARTING_THROTTLE, derivative_throttle, throttle_PID = 0;
 
 // Mixer
 float m1_command_scaled, m2_command_scaled, m3_command_scaled, m4_command_scaled, m5_command_scaled, m6_command_scaled;
@@ -367,58 +390,6 @@ int s1_command_PWM, s2_command_PWM, s3_command_PWM, s4_command_PWM, s5_command_P
 
 void setup()
 {
-#ifdef BLUETOOTH_EN
-  Serial8.begin(9600); // USB serial
-#endif
-
-  Serial.begin(50000);
-  delay(1000);
-#ifdef sdcard
-  if (!SD.begin(BUILTIN_SDCARD))
-  {
-    Serial.println("initialization of SDCARD failed!");
-    while (1)
-      ;
-  }
-
-#endif
-
-#ifdef BMP280
-  delay(1000);
-  unsigned status;
-  status = bmp.begin(0x77);
-  if (!status)
-  {
-    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
-                     "try a different address!"));
-    while (1)
-    {
-      status = bmp.begin(0x76);
-      delay(1000);
-    }
-  }
-  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,     /* Operating Mode. */
-                  Adafruit_BMP280::SAMPLING_X2,     /* Temp. oversampling */
-                  Adafruit_BMP280::SAMPLING_X16,    /* Pressure oversampling */
-                  Adafruit_BMP280::FILTER_X16,      /* Filtering. */
-                  Adafruit_BMP280::STANDBY_MS_500); /* Standby time. */
-  calibrateForAltitude();                           // ALtitude
-#endif
-
-#ifdef compass
-  if (!mag.begin())
-  {
-    /* There was a problem detecting the HMC5883 ... check your connections */
-    Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
-    while (1)
-      ;
-  }
-#endif
-#ifdef m8nGPS
-  Serial5.begin(9600); /* Define baud rate for software serial communication */
-  Serial.println("Initializing GPS");
-#endif
-
   // Initialize all pins
   pinMode(mux_pin, OUTPUT);
   digitalWrite(mux_pin, LOW);
@@ -436,6 +407,55 @@ void setup()
   servo5.attach(servo5Pin, 900, 2100);
   servo6.attach(servo6Pin, 900, 2100);
   servo7.attach(servo7Pin, 900, 2100);
+
+#ifdef BLUETOOTH_EN
+  Serial8.begin(9600); // USB serial
+#endif
+
+  Serial.begin(50000);
+  delay(1000);
+
+#ifdef sdcard
+  if (!SD.begin(BUILTIN_SDCARD))
+  {
+    Serial.println("initialization of SDCARD failed!");
+    DisplayErrorCode(1);
+    while (1)
+      ;
+  }
+
+#endif
+
+#ifdef BMP280
+  delay(1000);
+  unsigned status;
+  status = bmp.begin(0x77);
+  if (!status)
+  {
+    Serial.println(F("Could not find a valid BMP280 sensor, check wiring or "
+                     "try a different address!"));
+    DisplayErrorCode(2);
+  }
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,   /* Operating Mode. */
+                  Adafruit_BMP280::SAMPLING_X2,   /* Temp. oversampling */
+                  Adafruit_BMP280::SAMPLING_X16,  /* Pressure oversampling */
+                  Adafruit_BMP280::FILTER_X16,    /* Filtering. */
+                  Adafruit_BMP280::STANDBY_MS_1); /* Standby time. */
+  calibrateForAltitude();                         // ALtitude
+#endif
+
+#ifdef compass
+  if (!mag.begin())
+  {
+    /* There was a problem detecting the HMC5883 ... check your connections */
+    Serial.println("Ooops, no HMC5883 detected ... Check your wiring!");
+    DisplayErrorCode(3);
+  }
+#endif
+#ifdef m8nGPS
+  Serial5.begin(9600); /* Define baud rate for software serial communication */
+  Serial.println("Initializing GPS");
+#endif
 
   // Set built in LED to turn on to signal startup
   digitalWrite(13, HIGH);
@@ -459,7 +479,7 @@ void setup()
   delay(5);
 
   // Get IMU error to zero accelerometer and gyro readings, assuming vehicle is level when powered up
-  calculate_IMU_error(); // Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
+  // calculate_IMU_error(); // Calibration parameters printed to serial monitor. Paste these in the user specified variables section, then comment this out forever.
 
   // Arm servo channels
   servo1.write(0); // Command servo angle from 0-180 degrees (1000 to 2000 PWM)
@@ -492,10 +512,13 @@ void setup()
 
   // if using compass then also uncomment this calibrate magnometer
 
+#ifdef ALTITUDE_HOLD_AUTO
+  // for recieving altitude from raspberry pi
   Wire1.setSDA(17);
   Wire1.setSCL(16);
   Wire1.begin(0x44);
   Wire1.onReceive(set_altitude_of_quad);
+#endif
 }
 
 //========================================================================================================================//
@@ -513,43 +536,43 @@ void loop()
 
   // Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   // printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
-   //printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
+  // printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
   //  printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   // printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-  //printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
+  // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
   //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
-   printAltitudeData();
-
-#ifdef sdcard
-  log_data();
-#endif
+  printAltitudeData();
+  //  printFlightMode();
 
 #ifdef m8nGPS
 // print_gps_data();
 #endif
 
-  // #ifdef compass
-  //   get_heading();
-  // #endif
-  //  printFlightMode();
-  //  Get vehicle state
-  getIMUdata();                                                              // Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
-  Madgwick(GyroX, -GyroY, -GyroZ, -AccX, AccY, AccZ, MagY, -MagX, MagZ, dt); // Updates roll_IMU, pitch_IMU, and yaw_IMU angle estimates (degrees)
+#ifdef sdcard
+  log_data();
+#endif
 
+#ifdef compass
+  get_heading();
+#endif
 #ifdef BMP280
   get_altitude_from_barometer();
 #endif
 #ifdef HCSR04
   get_altitude_of_quad_from_ultrasonic();
 #endif
-
 #ifdef m8nGPS
   get_data_from_GPS();
 #endif
+
+  //  Get vehicle state
+  getIMUdata();                                                              // Pulls raw gyro, accelerometer, and magnetometer data from IMU and LP filters to remove noise
+  Madgwick(GyroX, -GyroY, -GyroZ, -AccX, AccY, AccZ, MagY, -MagX, MagZ, dt); // Updates roll_IMU, pitch_IMU, and yaw_IMU angle estimates (degrees)
+
   // Compute desired state
   getDesState(); // Convert raw commands to normalized values based on saturated control limits
 
@@ -563,8 +586,8 @@ void loop()
   scaleCommands(); // Scales motor commands to 125 to 250 range (oneshot125 protocol) and servo PWM commands to 0 to 180 (for servo library)
 
   // Throttle cut check
-  throttleCut();     // Directly sets motor commands to low based on state of ch5
-  checkFlightMode(); // change flight mode
+  throttleCut();   // Directly sets motor commands to low based on state of ch5
+  getFlightMode(); // change flight mode
   // Command actuators
   commandMotors();              // Sends command pulses to each motor pin using OneShot125 protocol
   servo1.write(s1_command_PWM); // Writes PWM value to servo object
@@ -644,9 +667,7 @@ void IMUinit()
     Serial.println("MPU6050 initialization unsuccessful");
     Serial.println("Check MPU6050 wiring or try cycling power");
 
-    while (1)
-    {
-    }
+    DisplayErrorCode(4);
   }
 
   // From the reset state all registers should be 0x00, so we should be at
@@ -670,9 +691,7 @@ void IMUinit()
     Serial.println("Check MPU9250 wiring or try cycling power");
     Serial.print("Status: ");
     Serial.println(status);
-    while (1)
-    {
-    }
+    DisplayErrorCode(4);
   }
 
   // From the reset state all registers should be 0x00, so we should be at
@@ -1101,16 +1120,25 @@ void getDesState()
    *  is scaled to be within max yaw in degrees/sec. Also creates roll_passthru, pitch_passthru, and
    * yaw_passthru variables, to be used in commanding motors/servos with direct unstabilized commands in controlMixer().
    */
-  if (flight_mode == STABILIZE)
+
+  switch (flight_mode)
   {
+  case STABILIZE:
     thro_des = (channel_1_pwm - 1000.0) / 1000.0; // Between 0 and 1
-  }
-  else if (flight_mode == ALTITUDE_HOLD_AUTO)
-  {
-    // thro_des = (channel_1_pwm - 1000.0) / 1000.0; /////test mode logging
+    break;
+
+#ifdef ALTITUDE_HOLD_AUTO
+  case ALTITUDE_HOLD_AUTO:
     thro_des = throttle_PID; // specify throtle based on height
     // THINK ABOUT RANGES FUCKKKKKKKKKKKKKKKKKKKKKKKKK
+    break;
+#endif
+  default:
+    // STABILIZE mode
+    thro_des = (channel_1_pwm - 1000.0) / 1000.0; // Between 0 and 1
+    break;
   }
+
   roll_des = (channel_2_pwm - 1500.0) / 500.0;  // Between -1 and 1
   pitch_des = (channel_3_pwm - 1500.0) / 500.0; // Between -1 and 1
   yaw_des = (channel_4_pwm - 1500.0) / 500.0;   // Between -1 and 1
@@ -1146,7 +1174,7 @@ void controlANGLE()
   error_roll = roll_des - roll_IMU;
   integral_roll = integral_roll_prev + error_roll * dt;
   if ((channel_1_pwm < 1060 && flight_mode == STABILIZE)) // no scope for this in altitude _ mode as min throttle is high
-  { // Don't let integrator build if throttle is too low
+  {                                                       // Don't let integrator build if throttle is too low
     integral_roll = 0;
   }
   integral_roll = constrain(integral_roll, -i_limit, i_limit); // Saturate integrator to prevent unsafe buildup
@@ -1175,16 +1203,24 @@ void controlANGLE()
   derivative_yaw = (error_yaw - error_yaw_prev) / dt;
   yaw_PID = .01 * (Kp_yaw * error_yaw + Ki_yaw * integral_yaw + Kd_yaw * derivative_yaw); // Scaled by .01 to bring within -1 to 1 range
 
-  altitude_of_quad_after_algo = (altitude_of_quad_from_BMP > 2) ? altitude_of_quad_from_BMP : altitude_of_quad_from_ultrasonic;
+#if defined HCSR04 && defined BMP280
+  altitude_of_quad_after_algo = (altitude_of_quad_from_BMP > switching_altitude) ? altitude_of_quad_from_BMP : altitude_of_quad_from_ultrasonic;
+#elif defined BMP280
+  altitude_of_quad_after_algo = altitude_of_quad_from_BMP;
+#elif defined HCSR04
+  altitude_of_quad_after_algo = altitude_of_quad_from_ultrasonic;
+#endif
+
+#ifdef ALTITUDE_HOLD_AUTO
   running_average[location_in_running_average] = altitude_of_quad_after_algo;
   location_in_running_average++;
-  if (location_in_running_average == length_of_running_average) location_in_running_average = 0;
+
+  if (location_in_running_average == length_of_running_average)
+    location_in_running_average = 0;
 
   altitude_of_quad_after_algo_smoothed = 0;
-  for(int i = 0 ; i < length_of_running_average ; i++)
+  for (int i = 0; i < length_of_running_average; i++)
     altitude_of_quad_after_algo_smoothed += altitude_of_quad_after_algo / length_of_running_average;
-  
-
 
   if (flight_mode == ALTITUDE_HOLD_AUTO)
   {
@@ -1207,11 +1243,11 @@ void controlANGLE()
       integral_throttle_prev = integral_throttle;
     }
 
-    altitude_throttle_prev = altitude_of_quad_after_algo_smoothed;
     error_throttle_prev = error_throttle;
   }
+  throttle_PID = constrain(throttle_PID, 0.3, 1.0); // set max cap on throttle
+#endif
 
-  throttle_PID = constrain(throttle_PID, 0.3,1.0); // set max cap on throttle
   // if (current_time - throttle_time_last_increased > 0) // now 2000 hz
   // {                                                    // 100 hz = 10000
   //   throttle_time_last_increased = micros();
@@ -1878,16 +1914,14 @@ void calibrateMagnetometer()
 #elif defined compass
   // DOOOOO SOMETHINGGGGGGGGG]
   Serial.println("magnometer callibration not implemented");
-  while (1)
-    ;
+  DisplayErrorCode(7);
 #endif
 
 #ifdef BLUETOOTH_EN
   Serial8.println("Error: MPU9250 not selected. Cannot calibrate non-existent magnetometer.");
 #endif
   Serial.println("Error: MPU9250 not selected. Cannot calibrate non-existent magnetometer.");
-  while (1)
-    ; // Halt code so it won't enter main loop until this function commented out
+  DisplayErrorCode(5);
 }
 
 void loopRate(int freq)
@@ -2154,6 +2188,18 @@ void printGyroData()
 }
 
 #ifdef BMP280
+void get_altitude_from_barometer()
+{
+  if (current_time - time_since_last_alt_from_BMP > 10000) // 100HZ
+  {
+    time_since_last_alt_from_BMP = micros();
+    // Serial.println("getting Altitude");
+    double temp_alt = bmp.readAltitude(normalize_pressure);
+    altitude_of_quad_from_BMP = isnan(temp_alt) ? altitude_of_quad_from_BMP : temp_alt;
+    altitude_of_quad_from_BMP = constrain(altitude_of_quad_from_BMP, 0, 100);
+    // get altitude from sensor
+  }
+}
 void calibrateForAltitude()
 {
   // enter calibration code
@@ -2300,25 +2346,11 @@ void print_gps_data()
   }
 }
 #endif
-#ifdef BMP280
-void get_altitude_from_barometer()
-{
-  if (current_time - time_since_last_altitude > 10000) // 100HZ
-  {
-    time_since_last_altitude = micros();
-    // Serial.println("getting Altitude");
-    double temp_alt = bmp.readAltitude(normalize_pressure);
-    altitude_of_quad_from_BMP = isnan(temp_alt) ? altitude_of_quad_from_BMP : temp_alt;
-    altitude_of_quad_from_BMP = constrain(altitude_of_quad_from_BMP, 0, 100);
-    // get altitude from sensor
-  }
-}
-#endif
 
 #ifdef HCSR04
 void get_altitude_of_quad_from_ultrasonic()
-{
-  Wire.requestFrom(32, 1); // request 6 bytes from slave device #8
+{ // dont exceed 2000 hz untested
+  Wire.requestFrom(32, 1);
   double distance = 125;
   while (Wire.available())
   {                         // slave may send less than requested
@@ -2346,10 +2378,29 @@ void printAltitudeData()
     Serial.print("Altitude from Ultrasonic is ");
     Serial.println(altitude_of_quad_from_ultrasonic);
 #endif
+#if defined(HCSR04) && defined(BMP280)
     Serial.print("Altitude from algo");
     Serial.println(altitude_of_quad_after_algo);
     Serial.print("Altitude from algo smooth");
     Serial.println(altitude_of_quad_after_algo_smoothed);
+#endif
+  }
+}
+
+void DisplayErrorCode(byte error_code)
+{
+  // blink error code in one second then wait 3 seconds
+  // delay = 1000/error_code; // blink at a gap of this
+  while (true)
+  {
+    for (byte i = 0; i < error_code; i++)
+    {
+      digitalWrite(13, HIGH);
+      delay(int(1000 / error_code / 2));
+      digitalWrite(13, LOW);
+      delay(int(1000 / error_code / 2));
+    }
+    delay(3000);
   }
 }
 
@@ -2363,6 +2414,7 @@ void printFlightMode()
   }
 }
 
+#ifdef ALTITUDE_HOLD_AUTO
 void set_altitude_of_quad(int numBytes)
 {
   int tens_of_m;
@@ -2373,10 +2425,11 @@ void set_altitude_of_quad(int numBytes)
 
   altitude_to_achieve = tens_of_m / 10;
 }
+#endif
 
-void checkFlightMode()
+void getFlightMode()
 {
-#ifdef BMP280
+#ifdef ALTITUDE_HOLD_AUTO
   if (channel_6_pwm > 1500)
   {
     flight_mode = ALTITUDE_HOLD_AUTO;
