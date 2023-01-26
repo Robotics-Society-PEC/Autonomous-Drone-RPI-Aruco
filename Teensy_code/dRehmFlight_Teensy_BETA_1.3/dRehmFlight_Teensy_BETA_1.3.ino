@@ -36,10 +36,10 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 // #define BLUETOOTH_EN
 // #define m8nGPS
 // #define HCSR04
-// #define compass
+#define compass
 #define sdcard
 #define BMP280
-#define LOG_FILE_NAME "log_bmp_s.txt"
+char LOG_FILE_NAME[] = "log_bmp_s.txt";
 
 // Uncomment only one receiver type
 #define mux_pin 32
@@ -228,12 +228,12 @@ double altitude_to_achieve = 0.8; // in metres
 float error_throttle, error_throttle_prev, integral_throttle, integral_throttle_prev = STARTING_THROTTLE, derivative_throttle, throttle_PID = 0;
 #endif
 
-#ifdef compass
+#if defined compass || defined USE_MPU9250_SPI
 float heading_degrees_from_compass = 0;
-unsigned long time_since_last_heading_from_compass;
 #endif
 
 // unsigned long throttle_time_last_increased = 0;
+byte address_of_register = 0;
 
 // Radio failsafe values for every channel in the event that bad reciever data is detected. Recommended defaults:
 unsigned long channel_1_fs = 1000; // thro
@@ -529,13 +529,12 @@ void setup()
   //  if using compass then also uncomment this calibrate magnometer
   // calibrateMagnetometer(); // Generates magentometer error and scale factors to be pasted in user-specified variables section
 
-#ifdef ALTITUDE_HOLD_AUTO
   // for recieving altitude from raspberry pi
   Wire1.setSDA(17);
   Wire1.setSCL(16);
   Wire1.begin(0x44);
-  Wire1.onReceive(set_altitude_of_quad);
-#endif
+  Wire1.onReceive(write_value_to_register);
+  Wire1.onRequest(read_value_from_register);
 }
 
 //========================================================================================================================//
@@ -556,7 +555,7 @@ void loop()
   // printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
-  //  printMagData();       //Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
+  printMagData(); // Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   // printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
   // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
@@ -1185,7 +1184,7 @@ void controlANGLE()
    * excessive buildup. This can be seen by holding the vehicle at an angle and seeing the motors ramp up on one side until
    * they've maxed out throttle...saturating I to a specified limit fixes this. The second feature defaults the I terms to 0
    * if the throttle is at the minimum setting. This means the motors will not start spooling up on the ground, and the I
-   * terms will always start from 0 on takeoff. This function updates the variables roll_PID, pitch_PID, and yaw_PID which
+   * terms will always start from 0 on takeoff. This function updates the variables roll_PID, pitcho_PID, and yaw_PID which
    * can be thought of as 1-D stablized signals. They are mixed to the configuration of the vehicle in controlMixer().
    */
 
@@ -2197,7 +2196,7 @@ void log_data()
 #ifdef HCSR04
         logfile.print("    Altitude from ultrasonic : ,");
 #endif
-#ifdef BMP280 || HCSR04
+#if defined BMP280 || defined HCSR04
         logfile.print("    Altitude from selection algo : ,");
         logfile.print("    Altitude from selection algo smotthed: ,");
 #endif
@@ -2269,7 +2268,7 @@ void log_data()
       logfile.print(altitude_of_quad_from_ultrasonic);
       logfile.print(",  ");
 #endif
-#ifdef BMP280 || HCSR04
+#if defined BMP280 || defined HCSR04
       logfile.print(altitude_of_quad_after_algo);
       logfile.print(",  ");
       logfile.print(altitude_of_quad_after_algo_smoothed);
@@ -2425,14 +2424,6 @@ void calibrateForAltitude()
 #ifdef compass
 void get_heading(int16_t *MgX, int16_t *MgY, int16_t *MgZ)
 {
-  if (current_time - time_since_last_heading_from_compass < 10000) // 100 hz = 10000
-  {
-
-    return;
-  }
-
-  time_since_last_heading_from_compass = micros();
-
   sensors_event_t event;
   mag.getEvent(&event);
 
@@ -2449,25 +2440,6 @@ void get_heading(int16_t *MgX, int16_t *MgY, int16_t *MgZ)
   // Serial.println("uT");
   // Hold the module so that Z is pointing 'up' and you can measure the heading with x&y
   // Calculate heading when the magnetometer is level, then correct for signs of axis.
-  float heading = atan2(event.magnetic.y, event.magnetic.x);
-
-  // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
-  // Find yours here: http://www.magnetic-declination.com/
-  // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
-  // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
-  float declinationAngle = 0.0303; // chandigarh
-  heading += declinationAngle;
-
-  // Correct for when signs are reversed.
-  if (heading < 0)
-    heading += 2 * PI;
-
-  // Check for wrap due to addition of declination.
-  if (heading > 2 * PI)
-    heading -= 2 * PI;
-
-  // Convert radians to degrees for readability.
-  heading_degrees_from_compass = heading * 180 / M_PI;
   *MgX = event.magnetic.x;
   *MgY = event.magnetic.y;
   *MgZ = event.magnetic.z;
@@ -2612,18 +2584,67 @@ void printFlightMode()
   }
 }
 
-#ifdef ALTITUDE_HOLD_AUTO
-void set_altitude_of_quad(int numBytes)
+void write_value_to_register(int numBytes)
 {
-  int tens_of_m;
-  while (Wire1.available())
+  // byte 0 means address of register
+  // byte 1 is data to be written
+  //  0th : flight mode
+  //  1st : altitude_to_achieve
+  //  2nd : distance_from_ground
+  //  4th : arming status
+  byte bytes_read = 0;
+  while (Wire1.available() && numBytes >= 2)
   {
-    tens_of_m = Wire1.read(); // if receive 25 means go to 2.5 meter
+    if (bytes_read == 0)
+    {
+      address_of_register = Wire1.read();
+    }
+    else if (bytes_read == 1)
+    {
+      switch (address_of_register)
+      {
+      case 1:
+        // altitude_to_achieve
+        altitude_to_achieve = Wire1.read() / 10;
+        break;
+      default:
+        Wire1.read();
+        break;
+      }
+    }
+    else
+    {
+      Wire1.read();
+    }
+    bytes_read++;
   }
-
-  altitude_to_achieve = tens_of_m / 10;
 }
-#endif
+
+void read_value_from_register()
+{
+  switch (address_of_register)
+  {
+  case 0:
+    Wire1.write(byte(flight_mode));
+    break;
+
+  case 1:
+    Wire1.write(byte(altitude_to_achieve * 10));
+    break;
+
+  case 2:
+    Wire1.write(byte(altitude_of_quad_after_algo_smoothed));
+    break;
+
+  case 3:
+    Wire1.write(byte(is_armed));
+    break;
+
+  default:
+    Wire1.write(byte(0));
+    break;
+  }
+}
 
 void getFlightMode()
 {
@@ -2680,12 +2701,34 @@ void printMagData()
     Serial8.print(F(" MagZ: "));
     Serial8.println(MagZ);
 #endif
+
+    float heading = atan2(MagY, MagX);
+
+    // Once you have your heading, you must then add your 'Declination Angle', which is the 'Error' of the magnetic field in your location.
+    // Find yours here: http://www.magnetic-declination.com/
+    // Mine is: -13* 2' W, which is ~13 Degrees, or (which we need) 0.22 radians
+    // If you cannot find your Declination, comment out these two lines, your compass will be slightly off.
+    float declinationAngle = -1.05; // chandigarh
+    heading += declinationAngle;
+
+    // Correct for when signs are reversed.
+    if (heading < 0)
+      heading += 2 * PI;
+
+    // Check for wrap due to addition of declination.
+    if (heading > 2 * PI)
+      heading -= 2 * PI;
+
+    // Convert radians to degrees for readability.
+    heading_degrees_from_compass = heading * 180 / M_PI;
     Serial.print(F("MagX: "));
     Serial.print(MagX);
     Serial.print(F(" MagY: "));
     Serial.print(MagY);
     Serial.print(F(" MagZ: "));
-    Serial.println(MagZ);
+    Serial.print(MagZ);
+    Serial.print(F(" Heading: "));
+    Serial.println(heading_degrees_from_compass);
   }
 }
 
