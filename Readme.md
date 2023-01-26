@@ -63,21 +63,21 @@ pip install --upgrade --force-reinstall <package_name>
 - [X] multi Aruco Support
 - [ ] Landing test
 - [ ] Searching algorithm in main code
-- [x] Calibration of mag needs to be done
+- [X] Calibration of mag needs to be done
 - [X] Fix Altitude Problems (Altitude shouldn't go negative)
-- [ ] Add low pass filter
-- [ ] Change arming sequence according to teensy 4.1
+- [X] Add low pass filter
+- [X] Change arming sequence according to teensy 4.1
 - [x] i2c communciation between rpi and teensy 4.1
 - [X] Need to reduce the percentage error on the throttle build up
 - [x] rpi aruco fit
-- [x] throttle cap increase
+- [X] throttle cap increase
 - [ ] error calculation
 - [x] read madgwick when calibrating
-- [X] implement running average on altitude and near the set point decrease Ki
+- [x] implement running average on altitude and near the set point decrease Ki
 - [ ] for landing altitude needs to be changed softly
 - [ ] test calibrateAttitude function
 - [ ] fix bluetooth // instead of this use #define
-- [ ] implement madgwick fir
+- [x] implement madgwick filter for compass
 - [ ] speed of i2c bus of raspberry pi may need to be changed
 - [ ] implement/check madwick for compass
 ## Our Teams Members
