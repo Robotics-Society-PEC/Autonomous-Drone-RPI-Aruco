@@ -36,7 +36,7 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 // #define BLUETOOTH_EN
 // #define m8nGPS
 // #define HCSR04
-#define compass
+// #define compass
 #define sdcard
 #define BMP280
 char LOG_FILE_NAME[] = "log_bmp_s.txt";
@@ -532,9 +532,11 @@ void setup()
   // for recieving altitude from raspberry pi
   Wire1.setSDA(17);
   Wire1.setSCL(16);
-  Wire1.begin(0x44);
+  pinMode(17, INPUT_PULLUP);
+  pinMode(16, INPUT_PULLUP);
   Wire1.onReceive(write_value_to_register);
   Wire1.onRequest(read_value_from_register);
+  Wire1.begin(0x44);
 }
 
 //========================================================================================================================//
@@ -551,17 +553,17 @@ void loop()
   loopBlink(); // Indicate we are in main loop with short blink every 1.5 seconds
 
   // Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
-  // printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
+  printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
   // printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
   //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
   //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
-  printMagData(); // Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
+  // printMagData(); // Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
   // printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
   //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
   // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
   //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
   //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
-  printAltitudeData();
+  // printAltitudeData();
   //  printFlightMode();
 
 #ifdef m8nGPS
@@ -1592,12 +1594,12 @@ void failSafe()
   // If any failures, set to default failsafe values
   if ((check1 + check2 + check3 + check4 + check5 + check6) > 0)
   {
-    channel_1_pwm = channel_1_fs;
-    channel_2_pwm = channel_2_fs;
-    channel_3_pwm = channel_3_fs;
-    channel_4_pwm = channel_4_fs;
-    channel_5_pwm = channel_5_fs;
-    channel_6_pwm = channel_6_fs;
+    // channel_1_pwm = channel_1_fs;
+    // channel_2_pwm = channel_2_fs;
+    // channel_3_pwm = channel_3_fs;
+    // channel_4_pwm = channel_4_fs;
+    // channel_5_pwm = channel_5_fs;
+    // channel_6_pwm = channel_6_fs;
     flight_mode = STABILIZE;
   }
 }
@@ -2593,11 +2595,13 @@ void write_value_to_register(int numBytes)
   //  2nd : distance_from_ground
   //  4th : arming status
   byte bytes_read = 0;
-  while (Wire1.available() && numBytes >= 2)
+  while (Wire1.available())
   {
     if (bytes_read == 0)
     {
       address_of_register = Wire1.read();
+      // Serial.println("address of register is now");
+      // Serial.println(address_of_register);
     }
     else if (bytes_read == 1)
     {
@@ -2605,7 +2609,7 @@ void write_value_to_register(int numBytes)
       {
       case 1:
         // altitude_to_achieve
-        altitude_to_achieve = Wire1.read() / 10;
+        altitude_to_achieve = Wire1.read() / 10.0;
         break;
       default:
         Wire1.read();
@@ -2622,6 +2626,8 @@ void write_value_to_register(int numBytes)
 
 void read_value_from_register()
 {
+  // Serial.println("register requested");
+  // Serial.println(address_of_register);
   switch (address_of_register)
   {
   case 0:
@@ -2633,7 +2639,7 @@ void read_value_from_register()
     break;
 
   case 2:
-    Wire1.write(byte(altitude_of_quad_after_algo_smoothed));
+    Wire1.write(byte(altitude_of_quad_after_algo_smoothed * 10.0));
     break;
 
   case 3:
@@ -2687,7 +2693,7 @@ void printAccelData()
     Serial.println(AccZ);
   }
 }
-
+#if defined compass || defined USE_MPU9250_SPI
 void printMagData()
 {
   if (current_time - print_counter > 10000)
@@ -2731,6 +2737,7 @@ void printMagData()
     Serial.println(heading_degrees_from_compass);
   }
 }
+#endif
 
 void printRollPitchYaw()
 {
