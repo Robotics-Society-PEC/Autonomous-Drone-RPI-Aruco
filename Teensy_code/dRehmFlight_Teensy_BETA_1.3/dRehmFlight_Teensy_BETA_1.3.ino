@@ -207,6 +207,7 @@ double normalize_pressure = 978.2;
 
 #if defined HCSR04 || defined BMP280
 #define ALTITUDE_HOLD_AUTO 1
+#define STABILIZE_ONLY_THROTTLE_MANUAL 2
 #endif
 
 // params related to altitude hold mode
@@ -215,9 +216,9 @@ double normalize_pressure = 978.2;
 // float Ki_throttle = 0.1; // Throttle I-gain - angle mode
 // float Kd_throttle = 15;  // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
-float Kp_throttle = 4; // Throttle P-gain - altitude hold angle mode
-float Ki_throttle = 2; // Throttle I-gain - angle mode
-float Kd_throttle = 5; // Throttle D-gain - angle mode (has no effect on controlANGLE2)
+float Kp_throttle = 5;   // Throttle P-gain - altitude hold angle mode
+float Ki_throttle = 0.8; // Throttle I-gain - angle mode
+float Kd_throttle = 9.2; // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
 #ifdef ALTITUDE_HOLD_AUTO
 unsigned long time_since_last_alt_from_BMP;
@@ -376,7 +377,7 @@ float q3 = 0.0f;
 
 // Normalized desired state:
 float thro_des, roll_des, pitch_des, yaw_des;
-float roll_des_from_i2c = -0.002, pitch_des_from_i2c = -0.002, yaw_des_from_i2c = -0.004;
+float roll_des_from_i2c = 0, pitch_des_from_i2c = 0, yaw_des_from_i2c = 0;
 float roll_passthru, pitch_passthru, yaw_passthru;
 
 // Controller:
@@ -560,16 +561,16 @@ void loop()
   // Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   // printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
   printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
-  //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
-  //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
-  // printMagData(); // Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
-  // printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
-  //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-  // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
-  //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
-  //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
+                       //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
+                       //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
+                       // printMagData(); // Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
+                       // printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
+                       //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
+                       // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
+                       //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
+                       //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
   // printAltitudeData();
-  //  printFlightMode();
+  //   printFlightMode();
 
 #ifdef m8nGPS
 // print_gps_data();
@@ -1177,21 +1178,57 @@ void getDesState()
     // roll_des = constrain(roll_des_from_i2c, -1.0, 1.0) * maxRoll;    // Between -maxRoll and +maxRoll
     // pitch_des = constrain(pitch_des_from_i2c, -1.0, 1.0) * maxPitch; // Between -maxPitch and +maxPitch
     // yaw_des = constrain(yaw_des_from_i2c, -1.0, 1.0) * maxYaw;       // Between -maxYaw and +maxYaw
+    roll_des = (channel_2_pwm - 1500.0) / 500.0;                                 // Between -1 and 1
+    pitch_des = (channel_3_pwm - 1500.0) / 500.0;                                // Between -1 and 1
+    yaw_des = (channel_4_pwm - 1500.0) / 500.0;                                  // Between -1 and 1
+    roll_passthru = (roll_des + roll_des_from_i2c) / 2.0;                          // Between -0.5 and 0.5
+    pitch_passthru = (pitch_des + pitch_des_from_i2c) / 2.0;                       // Between -0.5 and 0.5
+    yaw_passthru = (yaw_des + yaw_des_from_i2c) / 2.0;                             // Constrain within normalized bounds
+    thro_des = constrain(thro_des, 0.0, 1.0);                                    // Between 0 and 1
+    roll_des = constrain(roll_des + roll_des_from_i2c, -1.0, 1.0) * maxRoll;     // Between -maxRoll and +maxRoll
+    pitch_des = constrain(pitch_des + pitch_des_from_i2c, -1.0, 1.0) * maxPitch; // Between -maxPitch and +maxPitch
+    yaw_des = constrain(yaw_des + yaw_des_from_i2c, -1.0, 1.0) * maxYaw;
+    break;
+#endif
+
+#ifdef STABILIZE_ONLY_THROTTLE_MANUAL
+  case STABILIZE_ONLY_THROTTLE_MANUAL:
+    thro_des = (channel_1_pwm - 1000.0) / 1000.0; // Between 0 and 1; // specify throtle based on height
+                                                  // roll des , pitch des , yaw des specified by raspberry
+                                                  // roll_passthru = roll_des_from_i2c / 2.0;                         // Between -0.5 and 0.5
+                                                  // pitch_passthru = pitch_des_from_i2c / 2.0;                       // Between -0.5 and 0.5
+                                                  // yaw_passthru = yaw_des_from_i2c / 2.0;                           // Between -0.5 and 0.5
+    // thro_des = constrain(thro_des, 0.0, 1.0);                        // Between 0 and 1
+    // roll_des = constrain(roll_des_from_i2c, -1.0, 1.0) * maxRoll;    // Between -maxRoll and +maxRoll
+    // pitch_des = constrain(pitch_des_from_i2c, -1.0, 1.0) * maxPitch; // Between -maxPitch and +maxPitch
+    // yaw_des = constrain(yaw_des_from_i2c, -1.0, 1.0) * maxYaw;       // Between -maxYaw and +maxYaw
+    roll_des = (channel_2_pwm - 1500.0) / 500.0;                                 // Between -1 and 1
+    pitch_des = (channel_3_pwm - 1500.0) / 500.0;                                // Between -1 and 1
+    yaw_des = (channel_4_pwm - 1500.0) / 500.0;                                  // Between -1 and 1
+    roll_passthru = (roll_des + roll_des_from_i2c) / 2.0;                          // Between -0.5 and 0.5
+    pitch_passthru = (pitch_des + pitch_des_from_i2c) / 2.0;                       // Between -0.5 and 0.5
+    yaw_passthru = (yaw_des + yaw_des_from_i2c) / 2.0;                             // Constrain within normalized bounds
+    thro_des = constrain(thro_des, 0.0, 1.0);                                    // Between 0 and 1
+    roll_des = constrain(roll_des + roll_des_from_i2c, -1.0, 1.0) * maxRoll;     // Between -maxRoll and +maxRoll
+    pitch_des = constrain(pitch_des + pitch_des_from_i2c, -1.0, 1.0) * maxPitch; // Between -maxPitch and +maxPitch
+    yaw_des = constrain(yaw_des + yaw_des_from_i2c, -1.0, 1.0) * maxYaw;
+    break;
+#endif
+  default:
+    // STABILIZE mode
+    thro_des = (channel_1_pwm - 1000.0) / 1000.0;           // Between 0 and 1
     roll_des = (channel_2_pwm - 1500.0) / 500.0;            // Between -1 and 1
     pitch_des = (channel_3_pwm - 1500.0) / 500.0;           // Between -1 and 1
     yaw_des = (channel_4_pwm - 1500.0) / 500.0;             // Between -1 and 1
     roll_passthru = roll_des / 2.0;                         // Between -0.5 and 0.5
     pitch_passthru = pitch_des / 2.0;                       // Between -0.5 and 0.5
-    yaw_passthru = yaw_des / 2.0;                           // Constrain within normalized bounds
+    yaw_passthru = yaw_des / 2.0;                           // Between -0.5 and 0.5
+                                                            // Constrain within normalized bounds
     thro_des = constrain(thro_des, 0.0, 1.0);               // Between 0 and 1
     roll_des = constrain(roll_des, -1.0, 1.0) * maxRoll;    // Between -maxRoll and +maxRoll
     pitch_des = constrain(pitch_des, -1.0, 1.0) * maxPitch; // Between -maxPitch and +maxPitch
-    yaw_des = constrain(yaw_des, -1.0, 1.0) * maxYaw;
-    break;
-#endif
-  default:
-    // STABILIZE mode
-    thro_des = (channel_1_pwm - 1000.0) / 1000.0; // Between 0 and 1
+    yaw_des = constrain(yaw_des, -1.0, 1.0) * maxYaw;       // Between -maxYaw and +maxYaw
+
     break;
   }
 
@@ -2300,7 +2337,8 @@ void log_data()
       logfile.print(altitude_of_quad_after_algo_smoothed);
       logfile.print(",  ");
 #endif
-      logfile.print(flight_mode ? "Altitudehold" : "Stabalize");
+      logfile.print(flight_mode == 1 ? "Altitudehold" : flight_mode == 0 ? "Stabalize"
+                                                                         : "STABILIZE_AUTO");
       logfile.print(",  ");
       logfile.print(roll_IMU);
       logfile.print(",  ");
@@ -2711,12 +2749,19 @@ void read_value_from_register()
 void getFlightMode()
 {
 #ifdef ALTITUDE_HOLD_AUTO
-  if (channel_6_pwm > 1500)
+  if (channel_6_pwm > 1800)
   {
 
     flight_mode = ALTITUDE_HOLD_AUTO;
     // digitalWrite(mux_pin, HIGH);
   }
+#ifdef STABILIZE_ONLY_THROTTLE_MANUAL
+  else if (channel_6_pwm < 1800 && channel_6_pwm > 1500)
+  {
+    flight_mode = STABILIZE_ONLY_THROTTLE_MANUAL;
+  }
+
+#endif
   else
   {
     flight_mode = STABILIZE;
