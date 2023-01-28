@@ -37,9 +37,9 @@ Everyone that sends me pictures and videos of your flying creations! -Nick
 // #define m8nGPS
 // #define HCSR04
 // #define compass
-#define sdcard
+// #define sdcard
 #define BMP280
-char LOG_FILE_NAME[] = "log_bmp_s.txt";
+char LOG_FILE_NAME[] = "lauda_lasson.txt";
 
 // Uncomment only one receiver type
 #define mux_pin 32
@@ -217,8 +217,8 @@ double normalize_pressure = 978.2;
 // float Kd_throttle = 15;  // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
 float Kp_throttle = 5;   // Throttle P-gain - altitude hold angle mode
-float Ki_throttle = 0.8; // Throttle I-gain - angle mode
-float Kd_throttle = 9.2; // Throttle D-gain - angle mode (has no effect on controlANGLE2)
+float Ki_throttle = 1.2; // Throttle I-gain - angle mode
+float Kd_throttle = 9;   // Throttle D-gain - angle mode (has no effect on controlANGLE2)
 
 #ifdef ALTITUDE_HOLD_AUTO
 unsigned long time_since_last_alt_from_BMP;
@@ -255,20 +255,29 @@ float B_gyro = 0.07;     // Gyro LP filter paramter, (MPU6050 default: 0.1. MPU9
 float B_mag = 1.0;       // Magnetometer LP filter parameter
 
 // Magnetometer calibration parameters - if using MPU9250, uncomment calibrateMagnetometer() in void setup() to get these values, else just ignore these
+#ifdef compass
 float MagErrorX = -9.97;
 float MagErrorY = -9.36;
 float MagErrorZ = -2.72;
 float MagScaleX = 1.00;
 float MagScaleY = 0.99;
 float MagScaleZ = 1.01;
+#else
+float MagErrorX = 0;
+float MagErrorY = 0;
+float MagErrorZ = 0;
+float MagScaleX = 1.00;
+float MagScaleY = 1.00;
+float MagScaleZ = 1.00;
+#endif
 
 // IMU calibration parameters - calibrate IMU using calculate_IMU_error() in the void setup() to get these values, then comment out calculate_IMU_error()
-float AccErrorX = 0.03;
-float AccErrorY = -0.01;
-float AccErrorZ = 0.09;
-float GyroErrorX = 2.69;
-float GyroErrorY = 2.34;
-float GyroErrorZ = -4.76;
+float AccErrorX = 0.02;
+float AccErrorY = -0.10;
+float AccErrorZ = -0.01;
+float GyroErrorX = -3.95;
+float GyroErrorY = -1.24;
+float GyroErrorZ = 1.06;
 
 // Controller parameters (take note of defaults before modifying!):
 float i_limit = 25.0;  // Integrator saturation level, mostly for safety (default 25.0)
@@ -560,15 +569,15 @@ void loop()
 
   // Print data at 100hz (uncomment one at a time for troubleshooting) - SELECT ONE:
   // printRadioData(); // Prints radio pwm values (expected: 1000 to 2000)
-  printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
-                       //   printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
-                       //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
-                       // printMagData(); // Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
-                       // printRollPitchYaw();  //Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
-                       //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
-                       // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
-                       //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
-                       //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
+  // printDesiredState(); // Prints desired vehicle state commanded in either degrees or deg/sec (expected: +/- maxAXIS for roll, pitch, yaw; 0 to 1 for throttle)
+  // printGyroData();      //Prints filtered gyro data direct from IMU (expected: ~ -250 to 250, 0 at rest)
+  //   printAccelData();     //Prints filtered accelerometer data direct from IMU (expected: ~ -2 to 2; x,y 0 when level, z 1 when level)
+  // printMagData(); // Prints filtered magnetometer data direct from IMU (expected: ~ -300 to 300)
+  // printRollPitchYaw(); // Prints roll, pitch, and yaw angles in degrees from Madgwick filter (expected: degrees, 0 when level)
+  //  printPIDoutput();     //Prints computed stabilized PID variables from controller and desired setpoint (expected: ~ -1 to 1)
+  // printMotorCommands(); // Prints the values being written to the motors (expected: 120 to 250)
+  //   printServoCommands(); //Prints the values being written to the servos (expected: 0 to 180)
+  //   printLoopRate();      //Prints the time between loops in microseconds (expected: microseconds between loop iterations)
   // printAltitudeData();
   //   printFlightMode();
 
@@ -576,9 +585,9 @@ void loop()
 // print_gps_data();
 #endif
 
-#ifdef sdcard
-  log_data();
-#endif
+  // #ifdef sdcard
+  //   log_data();
+  // #endif
 
 #ifdef BMP280
   get_altitude_from_barometer();
@@ -1181,9 +1190,9 @@ void getDesState()
     roll_des = (channel_2_pwm - 1500.0) / 500.0;                                 // Between -1 and 1
     pitch_des = (channel_3_pwm - 1500.0) / 500.0;                                // Between -1 and 1
     yaw_des = (channel_4_pwm - 1500.0) / 500.0;                                  // Between -1 and 1
-    roll_passthru = (roll_des + roll_des_from_i2c) / 2.0;                          // Between -0.5 and 0.5
-    pitch_passthru = (pitch_des + pitch_des_from_i2c) / 2.0;                       // Between -0.5 and 0.5
-    yaw_passthru = (yaw_des + yaw_des_from_i2c) / 2.0;                             // Constrain within normalized bounds
+    roll_passthru = (roll_des + roll_des_from_i2c) / 2.0;                        // Between -0.5 and 0.5
+    pitch_passthru = (pitch_des + pitch_des_from_i2c) / 2.0;                     // Between -0.5 and 0.5
+    yaw_passthru = (yaw_des + yaw_des_from_i2c) / 2.0;                           // Constrain within normalized bounds
     thro_des = constrain(thro_des, 0.0, 1.0);                                    // Between 0 and 1
     roll_des = constrain(roll_des + roll_des_from_i2c, -1.0, 1.0) * maxRoll;     // Between -maxRoll and +maxRoll
     pitch_des = constrain(pitch_des + pitch_des_from_i2c, -1.0, 1.0) * maxPitch; // Between -maxPitch and +maxPitch
@@ -1205,9 +1214,9 @@ void getDesState()
     roll_des = (channel_2_pwm - 1500.0) / 500.0;                                 // Between -1 and 1
     pitch_des = (channel_3_pwm - 1500.0) / 500.0;                                // Between -1 and 1
     yaw_des = (channel_4_pwm - 1500.0) / 500.0;                                  // Between -1 and 1
-    roll_passthru = (roll_des + roll_des_from_i2c) / 2.0;                          // Between -0.5 and 0.5
-    pitch_passthru = (pitch_des + pitch_des_from_i2c) / 2.0;                       // Between -0.5 and 0.5
-    yaw_passthru = (yaw_des + yaw_des_from_i2c) / 2.0;                             // Constrain within normalized bounds
+    roll_passthru = (roll_des + roll_des_from_i2c) / 2.0;                        // Between -0.5 and 0.5
+    pitch_passthru = (pitch_des + pitch_des_from_i2c) / 2.0;                     // Between -0.5 and 0.5
+    yaw_passthru = (yaw_des + yaw_des_from_i2c) / 2.0;                           // Constrain within normalized bounds
     thro_des = constrain(thro_des, 0.0, 1.0);                                    // Between 0 and 1
     roll_des = constrain(roll_des + roll_des_from_i2c, -1.0, 1.0) * maxRoll;     // Between -maxRoll and +maxRoll
     pitch_des = constrain(pitch_des + pitch_des_from_i2c, -1.0, 1.0) * maxPitch; // Between -maxPitch and +maxPitch
